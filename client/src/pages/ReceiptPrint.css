@@ -1,0 +1,119 @@
+body {
+  background: white !important;
+}
+
+.receipt-wrapper {
+  max-width: 350px; /* thermal */
+  margin: auto;
+  padding: 20px;
+  font-family: "Inter", sans-serif;
+  color: #222;
+}
+
+.header {
+  text-align: center;
+}
+
+.logo {
+  width: 120px;
+  margin: 0 auto 10px;
+}
+
+.shop-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.shop-info {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.divider {
+  border-bottom: 1px solid #ccc;
+  margin: 10px 0;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.box {
+  background: #f1f1f1;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.items-section {
+  margin-top: 10px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.item-desc {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.item-price {
+  font-weight: 600;
+}
+
+.totals {
+  font-size: 13px;
+}
+
+.grand-total {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.signature-box {
+  margin-top: 20px;
+  font-size: 12px;
+}
+
+.signature-line {
+  border-bottom: 1px solid #000;
+  height: 30px;
+  margin-top: 4px;
+}
+
+.footer {
+  text-align: center;
+  font-size: 11px;
+  margin-top: 10px;
+}
+
+.powered-by {
+  text-align: center;
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 4px;
+}
+
+/* REMOVE SIDEBAR WHEN PRINTING */
+@media print {
+  aside, header {
+    display: none !important;
+  }
+
+  .receipt-wrapper {
+    margin: 0;
+    max-width: 100%;
+  }
+}

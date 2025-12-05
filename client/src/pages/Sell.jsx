@@ -1,52 +1,64 @@
 // src/pages/Sell.jsx
-import React from "react";
+import React, { useState } from "react";
 import VehicleFitment from "../components/VehicleFitment";
+import CheckoutModal from "../components/CheckoutModal";
 
 export default function Sell() {
   // PRODUCT SEARCH
-  const [search, setSearch] = React.useState("");
+  const [search, setSearch] = useState("");
 
-  // CART
-  const [cart, setCart] = React.useState([]);
+  // CART STATE
+  const [cart, setCart] = useState([]);
 
-  // CUSTOMERS
-  const [customerSearch, setCustomerSearch] = React.useState("");
-  const [selectedCustomer, setSelectedCustomer] = React.useState(null);
-  const [showNewCustomerForm, setShowNewCustomerForm] = React.useState(false);
+  // CUSTOMER STATE
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
 
-  // DEMO CUSTOMERS (replace with Firebase later)
+  // CHECKOUT MODAL
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // TEMPORARY CUSTOMER DATA (Replace with Firebase later)
   const customers = [
     { id: 1, first: "John", last: "Doe", phone: "256-555-1212", type: "Retail" },
     { id: 2, first: "Maria", last: "Sanchez", phone: "256-222-8899", type: "Wholesale" },
     { id: 3, first: "Adam", last: "Walker", phone: "256-777-4545", type: "Retail" },
   ];
 
-  const filteredCustomers = customers.filter((c) =>
-    `${c.first} ${c.last}`.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.phone.includes(customerSearch)
-  );
+  const filteredCustomers =
+    customerSearch.trim().length === 0
+      ? []
+      : customers.filter(
+          (c) =>
+            `${c.first} ${c.last}`
+              .toLowerCase()
+              .includes(customerSearch.toLowerCase()) ||
+            c.phone.includes(customerSearch)
+        );
 
-  // DEMO PRODUCT LIST
+  // PRODUCT LIST (DEMO)
   const products = [
-    { id: 1, name: 'Pioneer 6.5" Coaxial Speakers', sku: "TS-A652F", price: 89.99, barcode: "123456", serial: "PN-001" },
-    { id: 2, name: 'Pioneer 12" Subwoofer', sku: "TS-W312D4", price: 129.99, barcode: "789012", serial: "PW-002" },
-    { id: 3, name: 'Hertz 6x9" Speakers', sku: "HZX690", price: 199.99, barcode: "345678", serial: "HZ-003" },
-    { id: 4, name: "Rockford Fosgate Mono Amp", sku: "R500X1D", price: 229.99, barcode: "901234", serial: "RF-004" },
+    { id: 1, name: `Pioneer 6.5" Coaxial Speakers`, sku: "TS-A652F", price: 89.99, barcode: "123456", serial: "PN-001" },
+    { id: 2, name: `Pioneer 12" Subwoofer`, sku: "TS-W312D4", price: 129.99, barcode: "789012", serial: "PW-002" },
+    { id: 3, name: `Hertz 6x9" Speakers`, sku: "HZX690", price: 199.99, barcode: "345678", serial: "HZ-003" },
+    { id: 4, name: `Rockford Fosgate Mono Amp`, sku: "R500X1D", price: 229.99, barcode: "901234", serial: "RF-004" },
     { id: 5, name: "Metra Dash Kit", sku: "95-6511", price: 29.99, barcode: "567890", serial: "MT-005" },
   ];
 
-  // SEARCH FUNCTIONALITY (NOW SUPPORTS BARCODE + SERIAL)
-  const filteredProducts = search.trim().length === 0 ? [] :
-    products.filter((p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(search)) ||
-      (p.serial && p.serial.toLowerCase().includes(search.toLowerCase()))
-    );
+  const filteredProducts =
+    search.trim().length === 0
+      ? []
+      : products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(search.toLowerCase()) ||
+            p.sku.toLowerCase().includes(search.toLowerCase()) ||
+            (p.barcode && p.barcode.includes(search)) ||
+            (p.serial && p.serial.toLowerCase().includes(search.toLowerCase()))
+        );
 
-  // ================================
+  // ============================
   // CART FUNCTIONS
-  // ================================
+  // ============================
   const addToCart = (product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
@@ -85,22 +97,24 @@ export default function Sell() {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // TAX CALCULATION
+  // ============================
+  // TOTALS
+  // ============================
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
   const taxRate = selectedCustomer?.type === "Wholesale" ? 0 : 0.095;
   const tax = subtotal * taxRate;
   const total = subtotal + tax;
 
-  // ================================
-  // LAYOUT
-  // ================================
+  // ============================
+  // UI LAYOUT
+  // ============================
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      {/* LEFT SIDE: VEHICLE FITMENT */}
+      {/* LEFT SIDE — VEHICLE FITMENT */}
       <VehicleFitment onAddProducts={addMultipleToCart} />
 
-      {/* RIGHT SIDE: PRODUCT SEARCH + CART */}
+      {/* RIGHT SIDE — POS PANEL */}
       <div className="bg-white p-4 rounded-xl shadow border border-gray-200 space-y-4">
 
         {/* SEARCH BAR */}
@@ -276,11 +290,27 @@ export default function Sell() {
             </div>
           </div>
 
-          <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+          {/* CHECKOUT BUTTON */}
+          <button
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+            onClick={() => setCheckoutOpen(true)}
+          >
             Checkout
           </button>
         </div>
       </div>
+
+      {/* CHECKOUT MODAL */}
+      <CheckoutModal
+        isOpen={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        cart={cart}
+        customer={selectedCustomer}
+        onComplete={(receipt) => {
+  localStorage.setItem("currentReceipt", JSON.stringify(receipt));
+  window.location.href = "/print-receipt";
+}}
+      />
     </div>
   );
 }
