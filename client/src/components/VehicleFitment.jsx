@@ -55,21 +55,36 @@ export default function VehicleFitment({ onAddProducts }) {
 
   // WHEN VEHICLE CHANGES, UPDATE FITMENT + PRODUCTS
   React.useEffect(() => {
-    const f = findFitment(
-      year ? Number(year) : null,
-      make || null,
-      model || null
-    );
+  const f = findFitment(
+    year ? Number(year) : null,
+    make || null,
+    model || null
+  );
 
-    setFitment(f);
+  setFitment(f);
 
-    if (f) {
-      const rec = getRecommendedProducts(f) || [];
-      setRecommended(rec);
-    } else {
-      setRecommended([]);
-    }
-  }, [year, make, model]);
+  if (f) {
+    const rec = getRecommendedProducts(f) || [];
+    setRecommended(rec);
+
+    // ⭐ SAVE SELECTED VEHICLE FOR RECEIPT ⭐
+    const selectedVehicle = {
+      year: Number(year),
+      make: f.make,
+      model: f.model,
+      trim: f.trim || "",
+      body: f.body || "",
+      radio: f.radio || null,
+    };
+
+    console.log("Saving vehicle:", selectedVehicle); // DEBUG
+    localStorage.setItem("selectedVehicle", JSON.stringify(selectedVehicle));
+  } else {
+    setRecommended([]);
+    localStorage.removeItem("selectedVehicle");
+  }
+}, [year, make, model]);
+
 
   // CATEGORY FILTER
   const filteredRecommended =

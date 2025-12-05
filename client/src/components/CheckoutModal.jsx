@@ -21,28 +21,42 @@ export default function CheckoutModal({ isOpen, onClose, cart, customer, onCompl
   const isCashValid = paymentMethod !== "cash" || cashNum >= total;
 
   const handleComplete = () => {
-    if (paymentMethod === "cash" && cashNum < total) {
-      alert("Cash given is not enough.");
-      return;
-    }
+  if (paymentMethod === "cash" && cashNum < total) {
+    alert("Cash given is not enough.");
+    return;
+  }
 
-    const receipt = {
-      id: Date.now().toString(),
-      customer: customer || null,
-      items: cart,
-      subtotal,
-      tax,
-      total,
-      paymentMethod,
-      notes,
-      cashGiven: paymentMethod === "cash" ? cashNum : null,
-      changeDue: paymentMethod === "cash" ? change : null,
-      date: new Date().toISOString(),
-    };
+  // Pull selected vehicle (if any)
+  const selectedVehicle = JSON.parse(localStorage.getItem("selectedVehicle"));
 
-    onComplete(receipt);
-    onClose();
+  const receipt = {
+    id: Date.now().toString(),
+    customer: customer || null,
+    items: cart,
+    subtotal,
+    tax,
+    total,
+    paymentMethod,
+    notes,
+    cashGiven: paymentMethod === "cash" ? cashNum : null,
+    changeDue: paymentMethod === "cash" ? change : null,
+    date: new Date().toISOString(),
+
+    // VEHICLE INFO ADDED CLEANLY
+    vehicle: selectedVehicle
+      ? {
+          year: selectedVehicle.year,
+          make: selectedVehicle.make,
+          model: selectedVehicle.model,
+          trim: selectedVehicle.trim || "",
+          vin: selectedVehicle.vin || "",
+        }
+      : null,
   };
+
+  onComplete(receipt);
+  onClose();
+};
 
   return (
     <div className="checkout-overlay">
