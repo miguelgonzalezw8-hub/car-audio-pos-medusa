@@ -23,7 +23,6 @@ function normalizeCategory(cat = "") {
     return "Speakers";
 
   if (c.includes("sub") || c.includes("woofer")) return "Subwoofers";
-
   if (c.includes("amp")) return "Amplifiers";
 
   if (
@@ -39,54 +38,66 @@ function normalizeCategory(cat = "") {
   return "Other";
 }
 
-export default function VehicleFitment({ onAddProducts }) {
+export default function VehicleFitment({
+  onAddProducts,
+  onVehicleSelected,
+}) {
+  // ============================
+  // VEHICLE SELECTION
+  // ============================
   const [year, setYear] = React.useState("");
   const [make, setMake] = React.useState("");
   const [model, setModel] = React.useState("");
 
+  // ============================
+  // FITMENT + RECOMMENDATIONS
+  // ============================
   const [fitment, setFitment] = React.useState(null);
   const [recommended, setRecommended] = React.useState([]);
-
   const [category, setCategory] = React.useState("All");
 
   const years = getYearOptions();
   const makes = getMakeOptions(year || null);
   const models = getModelOptions(year || null, make || null);
 
-  // WHEN VEHICLE CHANGES, UPDATE FITMENT + PRODUCTS
+  // ============================
+  // RESOLVE VEHICLE FITMENT
+  // ============================
   React.useEffect(() => {
-  const f = findFitment(
-    year ? Number(year) : null,
-    make || null,
-    model || null
-  );
+    const f = findFitment(
+      year ? Number(year) : null,
+      make || null,
+      model || null
+    );
 
-  setFitment(f);
+    setFitment(f);
 
-  if (f) {
-    const rec = getRecommendedProducts(f) || [];
-    setRecommended(rec);
+    if (f) {
+      const rec = getRecommendedProducts(f) || [];
+      setRecommended(rec);
 
-    // ⭐ SAVE SELECTED VEHICLE FOR RECEIPT ⭐
-    const selectedVehicle = {
-      year: Number(year),
-      make: f.make,
-      model: f.model,
-      trim: f.trim || "",
-      body: f.body || "",
-      radio: f.radio || null,
-    };
+      // ✅ EMIT VEHICLE TO SELL.JSX
+      if (onVehicleSelected) {
+        onVehicleSelected({
+          year: Number(year),
+          make: f.make,
+          model: f.model,
+          trim: f.trim || "",
+          body: f.body || "",
+          speakers: f.speakers || {},
+          radio: f.radio || null,
+          raw: f, // full reference if needed later
+        });
+      }
+    } else {
+      setRecommended([]);
+      if (onVehicleSelected) onVehicleSelected(null);
+    }
+  }, [year, make, model]);
 
-    console.log("Saving vehicle:", selectedVehicle); // DEBUG
-    localStorage.setItem("selectedVehicle", JSON.stringify(selectedVehicle));
-  } else {
-    setRecommended([]);
-    localStorage.removeItem("selectedVehicle");
-  }
-}, [year, make, model]);
-
-
-  // CATEGORY FILTER
+  // ============================
+  // FILTER RECOMMENDED BY CATEGORY
+  // ============================
   const filteredRecommended =
     category === "All"
       ? recommended
@@ -94,18 +105,22 @@ export default function VehicleFitment({ onAddProducts }) {
           (p) => normalizeCategory(p.category) === category
         );
 
-  // CLICK ANY PRODUCT TO ADD TO CART
+  // ============================
+  // ADD PRODUCTS
+  // ============================
   const handleClickProduct = (product) => {
     if (onAddProducts) onAddProducts([product]);
   };
 
-  // ADD ALL PRODUCTS
   const handleAddAll = () => {
     if (onAddProducts && filteredRecommended.length > 0) {
       onAddProducts(filteredRecommended);
     }
   };
 
+  // ============================
+  // UI
+  // ============================
   return (
     <div className="space-y-3 border p-3 rounded-lg bg-gray-50">
       <h3 className="text-md font-semibold">Vehicle Fitment</h3>
@@ -185,7 +200,7 @@ export default function VehicleFitment({ onAddProducts }) {
         </p>
       )}
 
-      {/* CATEGORY FILTER BUTTONS */}
+      {/* CATEGORY FILTER */}
       {fitment && (
         <div className="flex flex-wrap gap-2 pt-1">
           {[
@@ -211,7 +226,7 @@ export default function VehicleFitment({ onAddProducts }) {
         </div>
       )}
 
-      {/* PRODUCT LIST */}
+      {/* RECOMMENDED PRODUCTS */}
       {fitment && (
         <div className="space-y-1">
           <div className="flex justify-between items-center pt-1">

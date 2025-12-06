@@ -1,5 +1,5 @@
 // src/App.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 
 import Sell from "./pages/Sell";
@@ -7,10 +7,15 @@ import Inventory from "./pages/Inventory";
 import Settings from "./pages/Settings";
 import ReceiptEditor from "./pages/ReceiptEditor";
 import ReceiptPrint from "./pages/ReceiptPrint";
+import ProductCheckIn from "./pages/ProductCheckIn";
 
 // Simple placeholder for now
 function Dashboard() {
-  return <h1 className="text-2xl font-bold">Dashboard</h1>;
+  return (
+    <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+      Dashboard
+    </div>
+  );
 }
 
 const navItems = [
@@ -24,11 +29,31 @@ export default function App() {
   const location = useLocation();
   const hideLayout = location.pathname === "/print-receipt";
 
+  // ✅ GLOBAL DARK MODE STATE (read once)
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("theme") === "dark";
+  });
+
+  // ✅ APPLY DARK MODE TO <html>
+  useEffect(() => {
+    const html = document.documentElement;
+
+    if (darkMode) {
+      html.classList.add("dark");
+      html.setAttribute("data-theme", "dark");
+    } else {
+      html.classList.remove("dark");
+      html.setAttribute("data-theme", "light");
+    }
+
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
   return (
-    <div className="min-h-screen flex bg-slate-100">
-      {/* LEFT SIDEBAR */}
+    <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950">
+      {/* ================= SIDEBAR ================= */}
       {!hideLayout && (
-        <aside className="w-60 bg-slate-950 text-slate-50 flex flex-col">
+        <aside className="w-60 bg-slate-900 text-slate-100 flex flex-col">
           <div className="px-4 py-5 border-b border-slate-800">
             <div className="text-lg font-semibold tracking-tight">
               Sound Depot POS
@@ -60,11 +85,12 @@ export default function App() {
         </aside>
       )}
 
-      {/* RIGHT SIDE: HEADER + PAGE CONTENT */}
+      {/* ================= MAIN ================= */}
       <div className="flex-1 flex flex-col">
+        {/* HEADER */}
         {!hideLayout && (
-          <header className="h-14 flex items-center justify-between px-6 border-b border-slate-200 bg-white">
-            <div className="text-sm font-medium text-slate-700">
+          <header className="h-14 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
               {location.pathname === "/sell"
                 ? "Sell"
                 : location.pathname === "/inventory"
@@ -72,18 +98,30 @@ export default function App() {
                 : location.pathname.startsWith("/settings")
                 ? "Settings"
                 : "Dashboard"}
-            </div>
+            </span>
           </header>
         )}
 
+        {/* PAGE CONTENT */}
         <main className={`flex-1 ${hideLayout ? "" : "p-6"}`}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/sell" element={<Sell />} />
             <Route path="/inventory" element={<Inventory />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/inventory/check-in" element={<ProductCheckIn />} />
+
+            {/* ✅ Dark mode control lives in Settings */}
+            <Route
+              path="/settings"
+              element={
+                <Settings
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                />
+              }
+            />
+
             <Route path="/settings/receipt" element={<ReceiptEditor />} />
-            {/* Print page uses its own layout (hideLayout=true) */}
             <Route path="/print-receipt" element={<ReceiptPrint />} />
           </Routes>
         </main>

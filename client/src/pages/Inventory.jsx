@@ -1,11 +1,10 @@
-// src/pages/Inventory.jsx
 import React, { useState, useEffect } from "react";
 import "./Inventory.css";
 
 import AddProductModal from "../components/AddProductModal";
-import AddBrandModal from "../components/AddBrandModal"; // ✅ ONLY import once
+import AddBrandModal from "../components/AddBrandModal";
 
-// FIREBASE IMPORTS
+// FIREBASE
 import {
   collection,
   addDoc,
@@ -21,127 +20,143 @@ import {
 import { db } from "../firebase";
 
 export default function Inventory() {
+  // ===============================
+  // STATE
+  // ===============================
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [brandModalOpen, setBrandModalOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
 
-  // -----------------------------
-  // SAVE PRODUCT
-  // -----------------------------
+  // ===============================
+  // SAVE PRODUCT (MASTER PRODUCT)
+  // ===============================
   const handleSaveProduct = async (product) => {
     try {
-      if (editingItem) {
-        await updateDoc(doc(db, "inventory", editingItem.id), {
-          ...product,
-          cost: Number(product.cost) || 0,
-          price: Number(product.price) || 0,
-          stock: Number(product.stock) || 0,
-          updatedAt: serverTimestamp(),
-        });
+      const payload = {
+        ...product,
+        price: Number(product.price) || 0,
+        stock: Number(product.stock) || 0, // TEMP – will be derived later
+        updatedAt: serverTimestamp(),
+      };
 
-        alert("Product updated!");
+      if (editingItem) {
+        await updateDoc(doc(db, "products", editingItem.id), payload);
+        alert("Product updated");
         setEditingItem(null);
       } else {
-        await addDoc(collection(db, "inventory"), {
-          ...product,
-          cost: Number(product.cost) || 0,
-          price: Number(product.price) || 0,
-          stock: Number(product.stock) || 0,
+        await addDoc(collection(db, "products"), {
+          ...payload,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          active: true,
         });
-
-        alert("Product added!");
+        alert("Product added");
       }
 
       setModalOpen(false);
     } catch (err) {
-      console.error("Error saving product:", err);
-      alert("Failed to save product.");
+      console.error(err);
+      alert("Failed to save product");
     }
   };
 
-  // -----------------------------
+  // ===============================
   // SAVE BRAND
-  // -----------------------------
+  // ===============================
   const handleSaveBrand = async (brand) => {
     try {
       await addDoc(collection(db, "brands"), {
         ...brand,
         createdAt: serverTimestamp(),
       });
-
-      alert("Brand added!");
+      alert("Brand added");
       setBrandModalOpen(false);
     } catch (err) {
-      console.error("Brand save error:", err);
-      alert("Failed to save brand.");
+      console.error(err);
+      alert("Failed to save brand");
     }
   };
 
-  // -----------------------------
-  // DELETE PRODUCT
-  // -----------------------------
+  // ===============================
+  // DELETE PRODUCT (MASTER ONLY)
+  // ===============================
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this product?")) return;
-
+    if (!window.confirm("Delete this product master?")) return;
     try {
-      await deleteDoc(doc(db, "inventory", id));
-      alert("Product deleted.");
+      await deleteDoc(doc(db, "products", id));
     } catch (err) {
-      console.error("Delete failed:", err);
-      alert("Could not delete product.");
+      console.error(err);
+      alert("Delete failed");
     }
   };
 
-  // -----------------------------
-  // READ INVENTORY LIVE
-  // -----------------------------
+  // ===============================
+  // LOAD PRODUCTS (MASTER LIST)
+  // ===============================
   useEffect(() => {
-    const q = query(collection(db, "inventory"), orderBy("createdAt", "desc"));
-
+    const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setItems(data);
+      setItems(
+        snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
     });
-
     return () => unsubscribe();
   }, []);
 
-  // -----------------------------
-  // RENDER UI
-  // -----------------------------
+  // ===============================
+  // FILTER SEARCH
+  // ===============================
+  const filteredItems =
+    search.trim().length === 0
+      ? []
+      : items.filter((i) =>
+          `${i.name} ${i.brand} ${i.sku} ${i.barcode || ""}`
+            .toLowerCase()
+            .includes(search.toLowerCase())
+        );
+
+  // ===============================
+  // RENDER
+  // ===============================
   return (
     <div className="inventory-container">
-
-      {/* HEADER */}
-      <div className="inventory-header">
-        <h1>Inventory</h1>
-
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button className="add-btn" onClick={() => setBrandModalOpen(true)}>
-            + Add Brand
-          </button>
-
-          <button className="add-btn" onClick={() => setModalOpen(true)}>
-            + Add Product
-          </button>
-        </div>
-      </div>
 
       {/* SEARCH */}
       <div className="search-row">
         <input
-          className="search-box"
-          placeholder="Search by name, brand, SKU..."
+          className="search-box search-box-wide"
+          placeholder="Search products by name, brand, SKU, or barcode..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          autoFocus
         />
+      </div>
+
+      {/* ACTION TILES */}
+      <div className="inventory-tiles">
+
+        <div className="tile" onClick={() => setBrandModalOpen(true)}>
+          <span className="tile-title">🏷️ Add Brand</span>
+          <span className="tile-sub">Manufacturers & reps</span>
+        </div>
+
+        <div className="tile primary" onClick={() => setModalOpen(true)}>
+          <span className="tile-title">📦 Add Product</span>
+          <span className="tile-sub">Master product</span>
+        </div>
+
+        <div
+          className="tile"
+          onClick={() => alert("Product Check-In screen coming next")}
+        >
+          <span className="tile-title">📥 Product Check-In</span>
+          <span className="tile-sub">Receive inventory</span>
+        </div>
+
       </div>
 
       {/* TABLE */}
@@ -150,66 +165,70 @@ export default function Inventory() {
           <thead>
             <tr>
               <th>SKU</th>
+              <th>Barcode</th>
               <th>Name</th>
               <th>Brand</th>
               <th>Category</th>
-              <th>Cost</th>
-              <th>Price</th>
-              <th>Stock</th>
+              <th>Sell Price</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
 
           <tbody>
-            {items.length === 0 ? (
+            {search.trim().length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: "center", padding: 20 }}>
-                  No products yet.
+                <td colSpan={8} className="empty-state">
+                  Start typing to search inventory
+                </td>
+              </tr>
+            ) : filteredItems.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="empty-state">
+                  No matching products found
                 </td>
               </tr>
             ) : (
-              items
-                .filter((i) =>
-                  `${i.name} ${i.brand} ${i.sku}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase())
-                )
-                .map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.sku}</td>
-                    <td>{item.name}</td>
-                    <td>{item.brand}</td>
-                    <td>{item.category}</td>
-                    <td>${item.cost?.toFixed(2)}</td>
-                    <td>${item.price?.toFixed(2)}</td>
-                    <td>{item.stock}</td>
-
-                    <td className="actions-col">
-                      <button
-                        className="edit-btn"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setModalOpen(true);
-                        }}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
+              filteredItems.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.sku || "—"}</td>
+                  <td>{item.barcode || "—"}</td>
+                  <td>{item.name}</td>
+                  <td>{item.brand}</td>
+                  <td>{item.category}</td>
+                  <td>${Number(item.price || 0).toFixed(2)}</td>
+                  <td>
+                    {item.active === false ? (
+                      <span className="status inactive">Inactive</span>
+                    ) : (
+                      <span className="status active">Active</span>
+                    )}
+                  </td>
+                  <td className="actions-col">
+                    <button
+                      className="edit-btn"
+                      onClick={() => {
+                        setEditingItem(item);
+                        setModalOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDelete(item.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* PRODUCT MODAL */}
+      {/* MODALS */}
       <AddProductModal
         isOpen={modalOpen}
         onClose={() => {
@@ -220,7 +239,6 @@ export default function Inventory() {
         editingItem={editingItem}
       />
 
-      {/* BRAND MODAL */}
       <AddBrandModal
         isOpen={brandModalOpen}
         onClose={() => setBrandModalOpen(false)}

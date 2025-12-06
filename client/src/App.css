@@ -1,42 +1,68 @@
+/* ================================
+   ROOT RESET (DON’T FIGHT TAILWIND)
+   ================================ */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  min-height: 100vh;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* ================================
+   LIGHT MODE VARIABLES (DEFAULT)
+   ================================ */
+html[data-theme="light"] {
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+
+  --text-main: #020617;
+  --text-subtle: #64748b;
+
+  --border-light: #e2e8f0;
+
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+
+  --danger: #ef4444;
+  --success: #22c55e;
+
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.12);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* ================================
+   DARK MODE VARIABLES
+   ================================ */
+html[data-theme="dark"] {
+  --bg-main: #020617;
+  --bg-card: #020617;
+
+  --text-main: #e5e7eb;
+  --text-subtle: #94a3b8;
+
+  --border-light: #1e293b;
+
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+
+  --danger: #ef4444;
+  --success: #22c55e;
+
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --shadow-hover: 0 16px 36px rgba(0, 0, 0, 0.75);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* ================================
+   GLOBAL BASE STYLES
+   ================================ */
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
 }
 
+/* ================================
+   OPTIONAL CARD HELPER
+   ================================ */
 .card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-soft);
+  border-radius: 0.75rem;
 }

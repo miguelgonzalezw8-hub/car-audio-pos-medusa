@@ -2,48 +2,119 @@
 import React, { useState, useEffect } from "react";
 import "./AddProductModal.css";
 
-export default function AddProductModal({ isOpen, onClose, onSave, editingItem }) {
+import { db } from "../firebase";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy
+} from "firebase/firestore";
+
+export default function AddProductModal({
+  isOpen,
+  onClose,
+  onSave,
+  editingItem
+}) {
   const [form, setForm] = useState({
-    sku: "",
     name: "",
+    sku: "",
     brand: "",
+    subBrand: "",
     category: "",
     cost: "",
     price: "",
-    stock: "",
+    stock: ""
   });
 
-  // Load existing product when editing
+  const [brands, setBrands] = useState([]);
+  const [subbrands, setSubbrands] = useState([]);
+  const [showSubbrand, setShowSubbrand] = useState(false);
+
+  // ---------------------------------
+  // Load brands from Firestore
+  // ---------------------------------
+  useEffect(() => {
+    const q = query(collection(db, "brands"), orderBy("brandName"));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setBrands(list);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // ---------------------------------
+  // Preload form when editing
+  // ---------------------------------
   useEffect(() => {
     if (editingItem) {
       setForm({
-        sku: editingItem.sku || "",
         name: editingItem.name || "",
+        sku: editingItem.sku || "",
         brand: editingItem.brand || "",
+        subBrand: editingItem.subBrand || "",
         category: editingItem.category || "",
         cost: editingItem.cost || "",
         price: editingItem.price || "",
-        stock: editingItem.stock || "",
+        stock: editingItem.stock || ""
       });
+
+      const brand = brands.find(b => b.brandName === editingItem.brand);
+      if (brand?.enableSubbrands) {
+        setSubbrands(brand.subbrands || []);
+        setShowSubbrand(true);
+      } else {
+        setShowSubbrand(false);
+      }
     } else {
-      // Reset form when adding new product
       setForm({
-        sku: "",
         name: "",
+        sku: "",
         brand: "",
+        subBrand: "",
         category: "",
         cost: "",
         price: "",
-        stock: "",
+        stock: ""
       });
+      setShowSubbrand(false);
     }
-  }, [editingItem]);
+  }, [editingItem, brands]);
 
-  const update = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  // ---------------------------------
+  // Handle brand change
+  // ---------------------------------
+  const handleBrandChange = (value) => {
+    setForm(prev => ({
+      ...prev,
+      brand: value,
+      subBrand: ""
+    }));
+
+    const brand = brands.find(b => b.brandName === value);
+
+    if (brand && brand.enableSubbrands) {
+      setSubbrands(brand.subbrands || []);
+      setShowSubbrand(true);
+    } else {
+      setSubbrands([]);
+      setShowSubbrand(false);
+    }
   };
 
-  const handleSave = () => {
+  const handleChange = (e) => {
+    setForm(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  const handleSubmit = () => {
     onSave(form);
   };
 
@@ -51,66 +122,84 @@ export default function AddProductModal({ isOpen, onClose, onSave, editingItem }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-box"
-        onClick={(e) => e.stopPropagation()} // stop closing modal
-      >
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <h2 className="modal-title">
           {editingItem ? "Edit Product" : "Add Product"}
         </h2>
 
         <div className="modal-grid">
           <input
+            name="sku"
             placeholder="SKU"
             value={form.sku}
-            onChange={(e) => update("sku", e.target.value)}
+            onChange={handleChange}
           />
 
           <input
-            placeholder="Name"
+            name="name"
+            placeholder="Product Name"
             value={form.name}
-            onChange={(e) => update("name", e.target.value)}
+            onChange={handleChange}
           />
 
-          <input
-            placeholder="Brand"
-            value={form.brand}
-            onChange={(e) => update("brand", e.target.value)}
-          />
-
+          {/* BRAND DROPDOWN */}
           <select
-            value={form.category}
-            onChange={(e) => update("category", e.target.value)}
+            value={form.brand}
+            onChange={(e) => handleBrandChange(e.target.value)}
           >
-            <option value="">Category</option>
-            <option>Speakers</option>
-            <option>Subwoofers</option>
-            <option>Amplifiers</option>
-            <option>DSP</option>
-            <option>Installation</option>
-            <option>Accessories</option>
-            <option>Other</option>
+            <option value="">Select Brand</option>
+            {brands.map(b => (
+              <option key={b.id} value={b.brandName}>
+                {b.brandName}
+              </option>
+            ))}
           </select>
 
+          {/* SUB-BRAND DROPDOWN (conditional) */}
+          {showSubbrand && (
+            <select
+              name="subBrand"
+              value={form.subBrand}
+              onChange={handleChange}
+            >
+              <option value="">Select Sub-Brand</option>
+              {subbrands.map((sb, i) => (
+                <option key={i} value={sb}>
+                  {sb}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <input
+            name="category"
+            placeholder="Category"
+            value={form.category}
+            onChange={handleChange}
+          />
+
           <input
             type="number"
+            name="cost"
             placeholder="Cost"
             value={form.cost}
-            onChange={(e) => update("cost", e.target.value)}
+            onChange={handleChange}
           />
 
           <input
             type="number"
+            name="price"
             placeholder="Price"
             value={form.price}
-            onChange={(e) => update("price", e.target.value)}
+            onChange={handleChange}
           />
 
           <input
             type="number"
+            name="stock"
             placeholder="Stock Qty"
             value={form.stock}
-            onChange={(e) => update("stock", e.target.value)}
+            onChange={handleChange}
           />
         </div>
 
@@ -119,7 +208,7 @@ export default function AddProductModal({ isOpen, onClose, onSave, editingItem }
             Cancel
           </button>
 
-          <button className="save-btn" onClick={handleSave}>
+          <button className="save-btn" onClick={handleSubmit}>
             {editingItem ? "Save Changes" : "Add Product"}
           </button>
         </div>

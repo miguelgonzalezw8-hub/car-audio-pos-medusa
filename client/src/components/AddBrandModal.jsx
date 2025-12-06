@@ -1,7 +1,8 @@
+// src/components/AddBrandModal.jsx
 import React, { useState } from "react";
-import "./AddProductModal.css"; // reuses same styles
+import "./AddProductModal.css"; // reuse same modal styles
 import { db } from "../firebase";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function AddBrandModal({ isOpen, onClose }) {
   const [brandName, setBrandName] = useState("");
@@ -12,22 +13,41 @@ export default function AddBrandModal({ isOpen, onClose }) {
   const [subbrands, setSubbrands] = useState([""]);
 
   const handleSave = async () => {
-    if (!brandName.trim()) return alert("Brand name is required.");
+    if (!brandName.trim()) {
+      alert("Brand name is required.");
+      return;
+    }
 
     try {
       await addDoc(collection(db, "brands"), {
-        brandName,
-        repName,
-        repPhone,
-        repEmail,
+        // ✅ REQUIRED for dropdown
+        name: brandName.trim(),
+
+        // ✅ keep existing fields
+        brandName: brandName.trim(),
+        repName: repName.trim(),
+        repPhone: repPhone.trim(),
+        repEmail: repEmail.trim(),
+
         enableSubbrands,
-        subbrands: enableSubbrands ? subbrands.filter(Boolean) : [],
+        subbrands: enableSubbrands
+          ? subbrands.map((s) => s.trim()).filter(Boolean)
+          : [],
+
+        createdAt: serverTimestamp(),
       });
 
-      alert("Brand added!");
+      // reset form (optional but nice)
+      setBrandName("");
+      setRepName("");
+      setRepPhone("");
+      setRepEmail("");
+      setEnableSubbrands(false);
+      setSubbrands([""]);
+
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error("Error adding brand:", err);
       alert("Error adding brand.");
     }
   };
@@ -96,7 +116,7 @@ export default function AddBrandModal({ isOpen, onClose }) {
           {enableSubbrands && (
             <button
               className="add-btn"
-              style={{ marginTop: "5px" }}
+              type="button"
               onClick={addSubbrandField}
             >
               + Add Subbrand
