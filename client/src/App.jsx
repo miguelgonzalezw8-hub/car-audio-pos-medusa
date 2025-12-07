@@ -1,6 +1,7 @@
 // src/App.jsx
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import Login from "./components/Login";
 import React, { useState, useEffect } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import Sell from "./pages/Sell";
@@ -66,6 +67,11 @@ if (!authReady) {
     </div>
   );
 }
+
+if (!user) {
+  return <Login />;
+}
+
 
   return (
     <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950">
