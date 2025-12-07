@@ -105,25 +105,29 @@ export default function App() {
         {/* PAGE CONTENT */}
         <main className={`flex-1 ${hideLayout ? "" : "p-6"}`}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/sell" element={<Sell />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/inventory/check-in" element={<ProductCheckIn />} />
+  <Route path="/" element={<Dashboard />} />
+  <Route path="/sell" element={<Sell />} />
+  <Route path="/inventory" element={<Inventory />} />
+  <Route path="/inventory/check-in" element={<ProductCheckIn />} />
 
-            {/* ✅ Dark mode control lives in Settings */}
-            <Route
-              path="/settings"
-              element={
-                <Settings
-                  darkMode={darkMode}
-                  setDarkMode={setDarkMode}
-                />
-              }
-            />
+  {/* ✅ MUST COME FIRST */}
+  <Route
+  path="/settings/receipt"
+  element={<ReceiptEditor key="receipt-editor" />}
+/>
 
-            <Route path="/settings/receipt" element={<ReceiptEditor />} />
-            <Route path="/print-receipt" element={<ReceiptPrint />} />
-          </Routes>
+
+  <Route
+    path="/settings"
+    element={<Settings darkMode={darkMode} setDarkMode={setDarkMode} />}
+  />
+
+  <Route
+  path="/print-receipt"
+  element={<ReceiptPrint key="receipt-print" />}
+/>
+</Routes>
+
         </main>
       </div>
     </div>

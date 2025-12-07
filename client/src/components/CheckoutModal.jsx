@@ -1,140 +1,189 @@
-import React, { useState, useEffect } from "react";
-import "./CheckoutModal.css";
+import React, { useMemo, useState } from "react";
 
-export default function CheckoutModal({ isOpen, onClose, cart, customer, onComplete }) {
-  const [paymentMethod, setPaymentMethod] = useState("card");
-  const [cashGiven, setCashGiven] = useState("");
-  const [notes, setNotes] = useState("");
+import visa from "../assets/cc/visa.svg";
+import mastercard from "../assets/cc/mastercard.svg";
+import amex from "../assets/cc/amex.svg";
+import discover from "../assets/cc/discover.svg";
+
+export default function CheckoutModal({
+  isOpen,
+  onClose,
+  subtotal,
+  taxRate,
+  onCompletePayment,
+}) {
+  const [paymentType, setPaymentType] = useState(null);
+  const [cardType, setCardType] = useState(null);
+  const [discountPercent, setDiscountPercent] = useState("");
+  const [discountAmount, setDiscountAmount] = useState("");
+
+  const cardOptions = useMemo(
+    () => [
+      { type: "Visa", img: visa },
+      { type: "Mastercard", img: mastercard },
+      { type: "Amex", img: amex },
+      { type: "Discover", img: discover },
+    ],
+    []
+  );
+
+  const totals = useMemo(() => {
+    let discount = 0;
+
+    if (discountPercent) {
+      discount = (subtotal * Number(discountPercent)) / 100;
+    } else if (discountAmount) {
+      discount = Number(discountAmount);
+    }
+
+    const discountedSubtotal = Math.max(subtotal - discount, 0);
+    const tax = discountedSubtotal * taxRate;
+    const total = discountedSubtotal + tax;
+
+    return { discount, discountedSubtotal, tax, total };
+  }, [subtotal, discountPercent, discountAmount, taxRate]);
 
   if (!isOpen) return null;
 
-  // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const taxRate = customer?.type === "Wholesale" ? 0 : 0.095;
-  const tax = subtotal * taxRate;
-  const total = subtotal + tax;
-
-  // Change calculation
-  const cashNum = parseFloat(cashGiven) || 0;
-  const change = paymentMethod === "cash" ? cashNum - total : 0;
-
-  const isCashValid = paymentMethod !== "cash" || cashNum >= total;
-
-  const handleComplete = () => {
-  if (paymentMethod === "cash" && cashNum < total) {
-    alert("Cash given is not enough.");
-    return;
-  }
-
-  // Pull selected vehicle (if any)
-  const selectedVehicle = JSON.parse(localStorage.getItem("selectedVehicle"));
-
-  const receipt = {
-    id: Date.now().toString(),
-    customer: customer || null,
-    items: cart,
-    subtotal,
-    tax,
-    total,
-    paymentMethod,
-    notes,
-    cashGiven: paymentMethod === "cash" ? cashNum : null,
-    changeDue: paymentMethod === "cash" ? change : null,
-    date: new Date().toISOString(),
-
-    // VEHICLE INFO ADDED CLEANLY
-    vehicle: selectedVehicle
-      ? {
-          year: selectedVehicle.year,
-          make: selectedVehicle.make,
-          model: selectedVehicle.model,
-          trim: selectedVehicle.trim || "",
-          vin: selectedVehicle.vin || "",
-        }
-      : null,
-  };
-
-  onComplete(receipt);
-  onClose();
-};
-
   return (
-    <div className="checkout-overlay">
-      <div className="checkout-modal">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+      <div className="relative bg-white w-full max-w-md rounded-xl p-5 space-y-4 shadow-xl">
 
-        {/* HEADER */}
-        <h2>Checkout</h2>
+        {/* CLOSE BUTTON */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
+          aria-label="Close checkout"
+        >
+          ✕
+        </button>
 
-        {/* PAYMENT METHOD */}
-        <div className="section">
-          <label>Payment Method</label>
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-          >
-            <option value="card">Card</option>
-            <option value="cash">Cash</option>
-          </select>
+        <h2 className="text-lg font-semibold">💳 Payment</h2>
+
+        {/* PAYMENT TYPE */}
+        <div>
+          <div className="text-sm font-semibold mb-1">Payment Type</div>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              "Cash",
+              "Credit",
+              "Debit",
+              "Check",
+              "Gift Card",
+              "Store Credit",
+            ].map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setPaymentType(type);
+                  if (type !== "Credit") setCardType(null);
+                }}
+                className={`py-2 rounded-lg text-sm transition ${
+                  paymentType === type
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 hover:bg-gray-200"
+                }`}
+              >
+                {type === "Cash" && "💵 "}
+                {type === "Credit" && "💳 "}
+                {type === "Debit" && "🏦 "}
+                {type === "Check" && "🧾 "}
+                {type === "Gift Card" && "🎁 "}
+                {type === "Store Credit" && "🏪 "}
+                {type}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* CASH INPUT */}
-        {paymentMethod === "cash" && (
-          <div className="section">
-            <label>Cash Received</label>
-            <input
-              type="number"
-              value={cashGiven}
-              onChange={(e) => setCashGiven(e.target.value)}
-              placeholder="Enter cash amount"
-            />
-            {cashGiven && (
-              <p className={change < 0 ? "text-red" : "text-green"}>
-                Change Due: ${change.toFixed(2)}
-              </p>
-            )}
+        {/* CREDIT CARD TYPE */}
+        {paymentType === "Credit" && (
+          <div>
+            <div className="text-sm font-semibold mb-1">Card Type</div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {cardOptions.map((c) => (
+                <button
+                  key={c.type}
+                  onClick={() => setCardType(c.type)}
+                  className={`border rounded-lg p-3 flex items-center gap-3 transition ${
+                    cardType === c.type
+                      ? "ring-2 ring-blue-600 bg-blue-50"
+                      : "bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <img src={c.img} alt={c.type} className="h-7 w-auto" />
+                  <span className="text-sm font-medium">{c.type}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* SUMMARY */}
-        <div className="section summary">
-          <div className="row">
-            <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
-          </div>
-
-          <div className="row">
-            <span>Tax</span>
-            <span>${tax.toFixed(2)}</span>
-          </div>
-
-          <div className="row total">
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
-          </div>
-        </div>
-
-        {/* NOTES */}
-        <div className="section">
-          <label>Notes (optional)</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Installation notes, wiring, warranty info, etc..."
+        {/* DISCOUNTS */}
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            placeholder="% Discount"
+            value={discountPercent}
+            onChange={(e) => {
+              setDiscountPercent(e.target.value);
+              setDiscountAmount("");
+            }}
+            className="border rounded px-3 py-2 text-sm"
+          />
+          <input
+            placeholder="$ Discount"
+            value={discountAmount}
+            onChange={(e) => {
+              setDiscountAmount(e.target.value);
+              setDiscountPercent("");
+            }}
+            className="border rounded px-3 py-2 text-sm"
           />
         </div>
 
-        {/* FOOTER BUTTONS */}
-        <div className="button-row">
-          <button className="cancel-btn" onClick={onClose}>Cancel</button>
-
-          <button
-            className="confirm-btn"
-            disabled={!isCashValid}
-            onClick={handleComplete}
-          >
-            Complete Sale
-          </button>
+        {/* TOTALS */}
+        <div className="border-t pt-2 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>${subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Tax</span>
+            <span>${totals.tax.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between font-semibold text-base">
+            <span>Total</span>
+            <span>${totals.total.toFixed(2)}</span>
+          </div>
         </div>
+
+        {/* CONFIRM */}
+        <button
+          onClick={() =>
+            onCompletePayment({
+              paymentType,
+              cardType,
+              discount: totals.discount,
+              total: totals.total,
+            })
+          }
+          disabled={
+            !paymentType || (paymentType === "Credit" && !cardType)
+          }
+          className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold disabled:opacity-60"
+        >
+          ✅ Complete Payment
+        </button>
+
+        {/* CANCEL */}
+        <button
+          onClick={onClose}
+          className="w-full border py-2 rounded-lg text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+
       </div>
     </div>
   );

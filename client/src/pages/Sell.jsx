@@ -1,248 +1,383 @@
-// src/pages/Sell.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import VehicleFitment from "../components/VehicleFitment";
 import CheckoutModal from "../components/CheckoutModal";
+import { db } from "../firebase";
+
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+
+/* ================= PHONE FORMAT ================= */
+const formatPhone = (v) => {
+  const d = v.replace(/\D/g, "").slice(0, 10);
+  if (d.length < 4) return d;
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+};
 
 export default function Sell() {
-  // ============================
-  // VEHICLE STATE
-  // ============================
+  /* ================= STATE ================= */
   const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  // ============================
-  // PRODUCT SEARCH
-  // ============================
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+
   const [search, setSearch] = useState("");
-
-  // ============================
-  // CART STATE
-  // ============================
-  const [cart, setCart] = useState([]);
-
-  // ============================
-  // CUSTOMER STATE
-  // ============================
   const [customerSearch, setCustomerSearch] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
 
-  // ============================
-  // CHECKOUT MODAL
-  // ============================
+  const [cart, setCart] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  // ============================
-  // TEMP CUSTOMER DATA
-  // ============================
-  const customers = [
-    { id: 1, first: "John", last: "Doe", phone: "256-555-1212", type: "Retail" },
-    { id: 2, first: "Maria", last: "Sanchez", phone: "256-222-8899", type: "Wholesale" },
-    { id: 3, first: "Adam", last: "Walker", phone: "256-777-4545", type: "Retail" },
-  ];
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    type: "Retail",
+  });
+
+  /* ================= LOAD PRODUCTS ================= */
+  useEffect(() => {
+    const q = query(collection(db, "products"), where("active", "==", true));
+    return onSnapshot(q, (snap) =>
+      setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+  }, []);
+
+  /* ================= LOAD CUSTOMERS ================= */
+  useEffect(() => {
+    const q = query(collection(db, "customers"));
+    return onSnapshot(q, (snap) =>
+      setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+  }, []);
+
+  /* ================= FILTERS ================= */
+  const filteredProducts =
+    search.trim() === ""
+      ? []
+      : products.filter((p) =>
+          `${p.name} ${p.sku || ""} ${p.barcode || ""}`
+            .toLowerCase()
+            .includes(search.toLowerCase())
+        );
 
   const filteredCustomers =
-    customerSearch.trim().length === 0
+    customerSearch.trim() === ""
       ? []
-      : customers.filter(
-          (c) =>
-            `${c.first} ${c.last}`.toLowerCase().includes(customerSearch.toLowerCase()) ||
-            c.phone.includes(customerSearch)
+      : customers.filter((c) =>
+          `${c.firstName || ""} ${c.lastName || ""} ${c.phone || ""} ${c.email || ""}`
+            .toLowerCase()
+            .includes(customerSearch.toLowerCase())
         );
 
-  // ============================
-  // DEMO PRODUCTS (REPLACE W/ FIREBASE LATER)
-  // ============================
-  const products = [
-    { id: 1, name: `Pioneer 6.5" Coaxial Speakers`, sku: "TS-A652F", price: 89.99, size: "6.5 coaxial", category: "Speakers" },
-    { id: 2, name: `Pioneer 12" Subwoofer`, sku: "TS-W312D4", price: 129.99, size: "12", category: "Subwoofer" },
-    { id: 3, name: `Hertz 6x9" Speakers`, sku: "HZX690", price: 199.99, size: "6x9 coaxial", category: "Speakers" },
-    { id: 4, name: `Rockford Fosgate Mono Amp`, sku: "R500X1D", price: 229.99, category: "Amplifier" },
-    { id: 5, name: "Metra Dash Kit", sku: "95-6511", price: 29.99, category: "Dash Kit" },
-  ];
-
-  // ============================
-  // FITMENT HELPERS
-  // ============================
-  const normalizeSpeakerSize = (value = "") => {
-    const v = value.toLowerCase();
-    if (v.includes("6.5") || v.includes("6 1/2")) return "6.5";
-    if (v.includes("6x9") || v.includes("6 x 9")) return "6x9";
-    if (v === "1" || v.includes('1"')) return "1";
-    return null;
+  /* ================= CART ================= */
+  const addToCart = (product, source = "search") => {
+    setCart((prev) => [
+      ...prev,
+      {
+        cartId: crypto.randomUUID(),
+        productId: product.id,
+        name: product.name,
+        sku: product.sku || "",
+        price: Number(product.price || 0),
+        qty: 1,
+        source,
+        serialNumbers: source === "fitment" ? [] : null,
+      },
+    ]);
+    if (source === "search") setSearch("");
   };
 
-  const getVehicleSpeakerSizes = (vehicle) => {
-    if (!vehicle?.speakers) return [];
-
-    return [
-      ...(vehicle.speakers.front || []),
-      ...(vehicle.speakers.rear || []),
-      ...(vehicle.speakers.other || [])
-    ]
-      .map((s) => normalizeSpeakerSize(s.size))
-      .filter(Boolean);
-  };
-
-  const productFitsVehicle = (product, vehicle) => {
-    if (!vehicle) return false;
-
-    // Speakers must match speaker sizes
-    if (product.category === "Speakers") {
-      const productSize = normalizeSpeakerSize(product.size);
-      if (!productSize) return false;
-      return getVehicleSpeakerSizes(vehicle).includes(productSize);
-    }
-
-    // Everything else is universal for now
-    return true;
-  };
-
-  // ============================
-  // FILTERED PRODUCTS
-  // ============================
-  const filteredProducts =
-    search.trim().length === 0 || !selectedVehicle
-      ? []
-      : products.filter(
-          (p) =>
-            productFitsVehicle(p, selectedVehicle) &&
-            (
-              p.name.toLowerCase().includes(search.toLowerCase()) ||
-              p.sku.toLowerCase().includes(search.toLowerCase())
-            )
-        );
-
-  // ============================
-  // CART FUNCTIONS
-  // ============================
-  const addToCart = (product) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === product.id ? { ...i, qty: i.qty + 1 } : i
-        );
-      }
-      return [...prev, { ...product, qty: 1 }];
-    });
-  };
-
-  const increaseQty = (id) => {
+  const addSerial = (cartId, sn) => {
     setCart((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i))
+      prev.map((i) =>
+        i.cartId === cartId
+          ? { ...i, serialNumbers: [...i.serialNumbers, sn] }
+          : i
+      )
     );
   };
 
-  const decreaseQty = (id) => {
-    setCart((prev) =>
-      prev
-        .map((i) => (i.id === id ? { ...i, qty: i.qty - 1 } : i))
-        .filter((i) => i.qty > 0)
-    );
-  };
-
-  const removeItem = (id) => {
-    setCart((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  // ============================
-  // TOTALS
-  // ============================
-  const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const taxRate = selectedCustomer?.type === "Wholesale" ? 0 : 0.095;
   const tax = subtotal * taxRate;
   const total = subtotal + tax;
 
-  // ============================
-  // UI
-  // ============================
+  /* ================= SAVE CUSTOMER ================= */
+  const saveCustomer = async () => {
+    const ref = await addDoc(collection(db, "customers"), {
+      ...newCustomer,
+      phoneRaw: newCustomer.phone.replace(/\D/g, ""),
+      createdAt: serverTimestamp(),
+    });
+    setSelectedCustomer({ id: ref.id, ...newCustomer });
+    setCustomerSearch("");
+    setShowAddCustomer(false);
+  };
+
+  /* ================= QUOTES ================= */
+  const saveQuote = async (print) => {
+    const payload = {
+      type: "quote",
+      createdAt: serverTimestamp(),
+      customer: selectedCustomer,
+      vehicle: selectedVehicle,
+      items: cart,
+      totals: { subtotal, tax, total },
+    };
+
+    const ref = await addDoc(collection(db, "quotes"), payload);
+
+    if (print) {
+      localStorage.setItem(
+        "currentReceipt",
+        JSON.stringify({ ...payload, id: ref.id })
+      );
+      window.location.href = "/print-receipt";
+    }
+  };
+
+  /* ================= COMPLETE SALE ================= */
+  const completeSale = async (payment) => {
+    const payload = {
+      type: "sale",
+      status: "completed",
+      createdAt: serverTimestamp(),
+      customer: selectedCustomer,
+      vehicle: selectedVehicle,
+      payment,
+      items: cart,
+      totals: { subtotal, tax, total },
+    };
+
+    const ref = await addDoc(collection(db, "sales"), payload);
+    localStorage.setItem(
+      "currentReceipt",
+      JSON.stringify({ ...payload, id: ref.id })
+    );
+
+    setCart([]);
+    setCheckoutOpen(false);
+    window.location.href = "/print-receipt";
+  };
+
+  /* ================= UI ================= */
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       {/* VEHICLE FITMENT */}
-      <VehicleFitment onVehicleSelected={setSelectedVehicle} />
+      <VehicleFitment
+        onVehicleSelected={setSelectedVehicle}
+        onAddProduct={(p) => addToCart(p, "fitment")}
+      />
 
-      {/* POS PANEL */}
-      <div className="bg-white p-4 rounded-xl shadow border border-gray-200 space-y-4">
+      {/* ================= CART PANEL ================= */}
+      <div className="bg-white p-4 rounded-xl shadow border flex flex-col">
 
-        <input
-          type="text"
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full px-3 py-2 border rounded-lg"
-          disabled={!selectedVehicle}
-        />
+        {/* PRODUCT SEARCH */}
+        <div className="relative">
+          <input
+            placeholder="Search or scan product…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-11 px-3 rounded-lg border
+                       focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
 
-        {search.length > 0 && (
-          <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded bg-gray-50">
-            {filteredProducts.length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                {selectedVehicle
-                  ? "No compatible products found."
-                  : "Select a vehicle first."}
-              </p>
-            ) : (
-              filteredProducts.map((p) => (
+          {search && (
+            <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto
+                            rounded-lg border bg-white shadow">
+              {filteredProducts.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => addToCart(p)}
-                  className="p-3 border rounded-lg hover:bg-gray-100 cursor-pointer flex justify-between"
+                  onMouseDown={() => addToCart(p, "search")}
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-100"
                 >
-                  <p className="font-medium">{p.name}</p>
-                  <p className="font-semibold">${p.price.toFixed(2)}</p>
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-xs text-gray-500">
+                    {p.sku} · ${Number(p.price).toFixed(2)}
+                  </div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* CUSTOMER SEARCH */}
+        <div className="mt-4 relative">
+          <input
+            placeholder="Search customer (name, phone, email)…"
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="w-full h-11 px-3 rounded-lg border
+                       focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+
+          {filteredCustomers.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full max-h-40 overflow-y-auto
+                            rounded-lg border bg-white shadow">
+              {filteredCustomers.map((c) => (
+                <div
+                  key={c.id}
+                  onMouseDown={() => {
+                    setSelectedCustomer(c);
+                    setCustomerSearch("");
+                  }}
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                >
+                  <div className="font-medium">
+                    {c.firstName} {c.lastName}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {c.phone} {c.email && `· ${c.email}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowAddCustomer(true)}
+            className="mt-2 w-full h-11 rounded-lg border font-semibold"
+          >
+            ➕ Add Customer
+          </button>
+        </div>
+
+        {/* SELECTED CUSTOMER DISPLAY */}
+        {selectedCustomer && (
+          <div className="mt-3 rounded-lg border bg-blue-50 p-3 text-sm">
+            👤 <strong>{selectedCustomer.firstName} {selectedCustomer.lastName}</strong>
+            {selectedCustomer.phone && ` · ${selectedCustomer.phone}`}
+            {selectedCustomer.email && ` · ${selectedCustomer.email}`}
+            <button
+              onClick={() => setSelectedCustomer(null)}
+              className="ml-2 text-red-600 text-xs"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+
+        {/* ADD CUSTOMER FORM */}
+        {showAddCustomer && (
+          <div className="mt-3 p-3 border rounded bg-gray-50 space-y-2">
+            <input
+              placeholder="First name"
+              className="w-full px-2 py-1 border rounded"
+              onChange={(e) =>
+                setNewCustomer({ ...newCustomer, firstName: e.target.value })
+              }
+            />
+            <input
+              placeholder="Last name"
+              className="w-full px-2 py-1 border rounded"
+              onChange={(e) =>
+                setNewCustomer({ ...newCustomer, lastName: e.target.value })
+              }
+            />
+            <input
+              placeholder="Phone"
+              value={newCustomer.phone}
+              className="w-full px-2 py-1 border rounded"
+              onChange={(e) =>
+                setNewCustomer({
+                  ...newCustomer,
+                  phone: formatPhone(e.target.value),
+                })
+              }
+            />
+            <input
+              placeholder="Email"
+              className="w-full px-2 py-1 border rounded"
+              onChange={(e) =>
+                setNewCustomer({ ...newCustomer, email: e.target.value })
+              }
+            />
+            <button
+              onClick={saveCustomer}
+              className="w-full bg-blue-600 text-white py-2 rounded-lg"
+            >
+              Save Customer
+            </button>
           </div>
         )}
 
         {/* CART */}
-        <div>
-          <h2 className="text-xl font-semibold">Cart</h2>
-
-          {cart.length === 0 ? (
-            <div className="text-gray-500 text-sm border border-dashed rounded-lg p-6 text-center">
-              Cart is empty.
-            </div>
-          ) : (
-            cart.map((item) => (
-              <div key={item.id} className="flex justify-between border-b py-2">
-                <span>{item.name}</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => decreaseQty(item.id)}>-</button>
-                  <span>{item.qty}</span>
-                  <button onClick={() => increaseQty(item.id)}>+</button>
-                  <button onClick={() => removeItem(item.id)} className="text-red-500">
-                    Remove
-                  </button>
-                </div>
+        <div className="flex-1 mt-4 overflow-y-auto border-t pt-2">
+          {cart.map((i) => (
+            <div key={i.cartId} className="border-b py-2 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>{i.name}</span>
+                <span>${(i.price * i.qty).toFixed(2)}</span>
               </div>
-            ))
-          )
-        }</div>
 
-        <div className="border-t pt-4 space-y-2">
-          <div className="flex justify-between"><span>Total:</span><span>${total.toFixed(2)}</span></div>
+              {i.source === "fitment" && (
+                <input
+                  placeholder="Scan serial number"
+                  className="w-full px-2 py-1 border rounded text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.target.value.trim()) {
+                      addSerial(i.cartId, e.target.value.trim());
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
-        <button
-          className="w-full bg-blue-600 text-white py-2 rounded-lg"
-          onClick={() => setCheckoutOpen(true)}
-        >
-          Checkout
-        </button>
+        {/* TOTALS & ACTIONS */}
+        <div className="border-t pt-3 space-y-3">
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>${total.toFixed(2)}</span>
+          </div>
+
+          <button
+            onClick={() => setCheckoutOpen(true)}
+            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold"
+          >
+            ✅ Checkout
+          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => saveQuote(false)}
+              className="bg-white border py-2 rounded-lg"
+            >
+              💾 Save Quote
+            </button>
+
+            <button
+              onClick={() => saveQuote(true)}
+              className="bg-blue-600 text-white py-2 rounded-lg"
+            >
+              🖨 Print Quote
+            </button>
+          </div>
+        </div>
+
       </div>
 
+      {/* CHECKOUT MODAL */}
       <CheckoutModal
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        cart={cart}
-        customer={selectedCustomer}
-        onComplete={(receipt) => {
-          localStorage.setItem("currentReceipt", JSON.stringify(receipt));
-          window.location.href = "/print-receipt";
-        }}
+        subtotal={subtotal}
+        taxRate={taxRate}
+        total={total}
+        onCompletePayment={completeSale}
       />
     </div>
   );

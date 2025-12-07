@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Inventory.css";
 
 import AddProductModal from "../components/AddProductModal";
@@ -20,6 +21,8 @@ import {
 import { db } from "../firebase";
 
 export default function Inventory() {
+  const navigate = useNavigate();
+
   // ===============================
   // STATE
   // ===============================
@@ -37,7 +40,7 @@ export default function Inventory() {
       const payload = {
         ...product,
         price: Number(product.price) || 0,
-        stock: Number(product.stock) || 0, // TEMP – will be derived later
+        stock: Number(product.stock) || 0, // TEMP – derived later
         updatedAt: serverTimestamp(),
       };
 
@@ -104,6 +107,7 @@ export default function Inventory() {
         }))
       );
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -124,7 +128,6 @@ export default function Inventory() {
   // ===============================
   return (
     <div className="inventory-container">
-
       {/* SEARCH */}
       <div className="search-row">
         <input
@@ -138,7 +141,6 @@ export default function Inventory() {
 
       {/* ACTION TILES */}
       <div className="inventory-tiles">
-
         <div className="tile" onClick={() => setBrandModalOpen(true)}>
           <span className="tile-title">🏷️ Add Brand</span>
           <span className="tile-sub">Manufacturers & reps</span>
@@ -149,14 +151,14 @@ export default function Inventory() {
           <span className="tile-sub">Master product</span>
         </div>
 
+        {/* ✅ FIXED: REAL NAVIGATION */}
         <div
           className="tile"
-          onClick={() => alert("Product Check-In screen coming next")}
+          onClick={() => navigate("/inventory/check-in")}
         >
           <span className="tile-title">📥 Product Check-In</span>
           <span className="tile-sub">Receive inventory</span>
         </div>
-
       </div>
 
       {/* TABLE */}
