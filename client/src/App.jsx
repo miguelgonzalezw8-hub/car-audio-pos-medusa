@@ -1,7 +1,8 @@
 // src/App.jsx
+import { auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import React, { useState, useEffect } from "react";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
-
 import Sell from "./pages/Sell";
 import Inventory from "./pages/Inventory";
 import Settings from "./pages/Settings";
@@ -24,10 +25,20 @@ const navItems = [
   { label: "Inventory", to: "/inventory" },
   { label: "Settings", to: "/settings" },
 ];
+const [user, setUser] = useState(null);
+const [authReady, setAuthReady] = useState(false);
 
 export default function App() {
   const location = useLocation();
   const hideLayout = location.pathname === "/print-receipt";
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+    setAuthReady(true);
+  });
+
+  return () => unsubscribe();
+}, []);
 
   // ✅ GLOBAL DARK MODE STATE (read once)
   const [darkMode, setDarkMode] = useState(() => {
@@ -48,6 +59,13 @@ export default function App() {
 
     localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+if (!authReady) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200">
+      Loading...
+    </div>
+  );
+}
 
   return (
     <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950">
