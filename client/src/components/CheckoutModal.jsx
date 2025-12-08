@@ -26,6 +26,7 @@ export default function CheckoutModal({
     []
   );
 
+  /* ================= TOTAL CALCS (UNCHANGED) ================= */
   const totals = useMemo(() => {
     let discount = 0;
 
@@ -39,16 +40,45 @@ export default function CheckoutModal({
     const tax = discountedSubtotal * taxRate;
     const total = discountedSubtotal + tax;
 
-    return { discount, discountedSubtotal, tax, total };
+    return {
+      discount,
+      discountedSubtotal,
+      tax,
+      total,
+    };
   }, [subtotal, discountPercent, discountAmount, taxRate]);
 
   if (!isOpen) return null;
+
+  /* ================= COMPLETE PAYMENT (FIXED) ================= */
+  const completePayment = () => {
+    onCompletePayment({
+      /* ✅ PAYMENT OBJECT (RECEIPT-SAFE) */
+      payment: {
+        method:
+          paymentType === "Credit" || paymentType === "Debit"
+            ? cardType || paymentType
+            : paymentType,
+        type: paymentType,
+        cardType: cardType || null,
+      },
+
+      /* ✅ TOTALS OBJECT (RECEIPT-SAFE) */
+      totals: {
+        subtotal,
+        tax: totals.tax,
+        total: totals.total,
+        discount: discountAmount ? Number(discountAmount) : null,
+        discountPercent: discountPercent ? Number(discountPercent) : null,
+      },
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
       <div className="relative bg-white w-full max-w-md rounded-xl p-5 space-y-4 shadow-xl">
 
-        {/* CLOSE BUTTON */}
+        {/* CLOSE */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl"
@@ -95,11 +125,10 @@ export default function CheckoutModal({
           </div>
         </div>
 
-        {/* CREDIT CARD TYPE */}
+        {/* CARD TYPE */}
         {paymentType === "Credit" && (
           <div>
             <div className="text-sm font-semibold mb-1">Card Type</div>
-
             <div className="grid grid-cols-2 gap-3">
               {cardOptions.map((c) => (
                 <button
@@ -159,14 +188,7 @@ export default function CheckoutModal({
 
         {/* CONFIRM */}
         <button
-          onClick={() =>
-            onCompletePayment({
-              paymentType,
-              cardType,
-              discount: totals.discount,
-              total: totals.total,
-            })
-          }
+          onClick={completePayment}
           disabled={
             !paymentType || (paymentType === "Credit" && !cardType)
           }

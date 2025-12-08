@@ -1,201 +1,224 @@
-import { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import "./ReceiptPrint.css";
 
 export default function ReceiptPrint() {
   const [receipt, setReceipt] = useState(null);
-  const [template, setTemplate] = useState(null);
+  const [logo, setLogo] = useState(null);
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    const stored = localStorage.getItem("currentReceipt");
-    if (stored) setReceipt(JSON.parse(stored));
+    const r = localStorage.getItem("currentReceipt");
+    if (r) setReceipt(JSON.parse(r));
+
+    const l = localStorage.getItem("receiptLogo");
+    if (l) setLogo(l);
   }, []);
 
-  useEffect(() => {
-    const loadTemplate = async () => {
-      const snap = await getDoc(doc(db, "settings", "receiptTemplate"));
-      if (snap.exists()) setTemplate(snap.data());
-    };
-    loadTemplate();
-  }, []);
+  if (!receipt) return <div className="p-6">No receipt data.</div>;
 
-  if (!receipt || !template) return null;
+  /* ================= NORMALIZE TOTALS ================= */
+  const totals = receipt.totals || {};
 
-  /* ================= HELPERS ================= */
+  let subtotal =
+    receipt.subtotal ??
+    totals.subtotal ??
+    0;
 
-  const money = (v) => `$${Number(v || 0).toFixed(2)}`;
+  let tax =
+    receipt.tax ??
+    totals.tax ??
+    0;
 
-  // ✅ BULLETPROOF DATE
-  let created = new Date();
-  if (receipt.createdAt?.seconds) {
-    created = new Date(receipt.createdAt.seconds * 1000);
-  } else if (receipt.createdAt && !isNaN(Date.parse(receipt.createdAt))) {
-    created = new Date(receipt.createdAt);
+  let total =
+    receipt.total ??
+    totals.total ??
+    0;
+
+  /* ================= DISCOUNT DETECTION ================= */
+  let discountAmount = 0;
+  let discountLabel = null;
+
+  if (totals.discountPercent) {
+    discountAmount = subtotal * (totals.discountPercent / 100);
+    discountLabel = `${totals.discountPercent}% Discount`;
+  } else if (totals.discount) {
+    discountAmount = totals.discount;
+    discountLabel = "Discount";
   }
 
-  const dateStr = created.toLocaleDateString();
-  const timeStr = created.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Item-level discounts fallback
+  if (!discountAmount && receipt.items?.length) {
+    receipt.items.forEach((i) => {
+      if (i.discountPercent) {
+        discountAmount += (i.price * i.qty) * (i.discountPercent / 100);
+        discountLabel = "Item Discount";
+      } else if (i.discount) {
+        discountAmount += i.discount;
+        discountLabel = "Item Discount";
+      }
+    });
+  }
 
-  const receiptNumber = receipt.receiptNumber || receipt.id || "—";
+  const discountedSubtotal = subtotal - discountAmount;
+  const finalTotal = discountedSubtotal + tax;
 
-  /* ================= UI ================= */
+  /* ================= PAYMENT DETECTION ================= */
+  let paymentMethod = "—";
+  let last4 = null;
+
+  const p = receipt.payment;
+
+  if (p) {
+    if (p.method) paymentMethod = p.method;
+    else if (p.type) paymentMethod = p.type;
+    else if (p.label) paymentMethod = p.label;
+    else if (p.cash) paymentMethod = "Cash";
+    else if (p.card) {
+      paymentMethod = p.card.brand || "Card";
+      last4 = p.card.last4;
+    }
+  }
+
+  /* ================= CUSTOMER ================= */
+  const customerName = receipt.customer
+    ? `${receipt.customer.firstName || ""} ${receipt.customer.lastName || ""}`.trim()
+    : "Walk-in Customer";
+
+  const customerPhone = receipt.customer?.phone || "";
+  const customerEmail = receipt.customer?.email || "";
+
+  /* ================= VEHICLE ================= */
+  const vehicleText = receipt.vehicle
+    ? `${receipt.vehicle.year || ""} ${receipt.vehicle.make || ""} ${receipt.vehicle.model || ""}`.trim()
+    : "—";
+
+  /* ================= ACTIONS ================= */
+  const print = () => window.print();
 
   return (
-    <div className="fixed inset-0 bg-gray-600/60 flex justify-center items-start pt-10 print:bg-white print:pt-0">
-      <div className="bg-white w-[920px] shadow-xl print:shadow-none print:w-full">
+    <div className="receipt-overlay">
+      <div className="receipt-modal">
 
-        {/* ================= ACTION HEADER (NO OVERLAP) ================= */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-b bg-gray-50 print:hidden">
-          <button
-            onClick={() => window.history.back()}
-            className="px-3 py-1 bg-red-600 text-white rounded"
-          >
-            ✕
-          </button>
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1 bg-indigo-600 text-white rounded"
-          >
-            Print
-          </button>
-          <button className="px-3 py-1 bg-gray-200 rounded">
-            Text Receipt
-          </button>
-          <button className="px-3 py-1 bg-gray-200 rounded">
-            Email Receipt
+        {/* CONTROLS */}
+        <div className="non-printable">
+          <button className="btn print-btn" onClick={print}>🖨 Print</button>
+          <button className="btn">📱 Text</button>
+          <button className="btn">✉️ Email</button>
+          <button className="btn close-btn" onClick={() => window.history.back()}>
+            Close
           </button>
         </div>
 
-        {/* ================= RECEIPT BODY ================= */}
-        <div className="p-12">
+        {/* PRINT AREA */}
+        <div id="receipt-print-area" className="receipt-page">
 
-          {/* LOGO */}
-          {template.logoUrl && (
-            <div className="text-center mb-8">
-              <img
-                src={template.logoUrl}
-                alt="Shop Logo"
-                className="mx-auto max-h-24 object-contain"
-              />
-            </div>
-          )}
-
-          {/* HEADER META */}
-          <div className="grid grid-cols-3 gap-8 text-sm mb-8">
-            <div>
-              <div className="font-semibold">Receipt Number</div>
-              <div>{receiptNumber}</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold">Date</div>
-              <div>{dateStr}</div>
-            </div>
-            <div className="text-right">
-              <div className="font-semibold">Time</div>
-              <div>{timeStr}</div>
-            </div>
+          {/* HEADER */}
+          <div className="header-block">
+            {logo && <img src={logo} className="logo-img" alt="Logo" />}
           </div>
 
-          {/* FROM / TO */}
-          <div className="grid grid-cols-2 gap-8 text-sm border-b pb-6 mb-6">
+          {/* TOP INFO */}
+          <div className="top-info-row">
             <div>
-              <div className="font-semibold">From</div>
-              <div>{template.shopName}</div>
-              <div>{template.address}</div>
-              <div>{template.phone}</div>
+              <div className="label">Receipt #</div>
+              <div className="value">{receipt.id || "—"}</div>
             </div>
-            <div className="text-right">
-              <div className="font-semibold">To</div>
-              <div>
-                {receipt.customer?.first
-                  ? `${receipt.customer.first} ${receipt.customer.last}`
-                  : "Walk-in Customer"}
+            <div>
+              <div className="label">Type</div>
+              <div className="value">{receipt.type || receipt.status || "Sale"}</div>
+            </div>
+            <div>
+              <div className="label">Date</div>
+              <div className="value">
+                {receipt.createdAt?.toDate
+                  ? receipt.createdAt.toDate().toLocaleDateString()
+                  : new Date().toLocaleDateString()}
               </div>
             </div>
           </div>
 
-          {/* VEHICLE */}
-          <div className="text-sm border-b pb-3 mb-6">
-            <div className="font-semibold">Vehicle</div>
+          {/* CUSTOMER / VEHICLE */}
+          <div className="from-to-section">
             <div>
-              {receipt.vehicle
-                ? `${receipt.vehicle.year} ${receipt.vehicle.make} ${receipt.vehicle.model}`
-                : "No vehicle recorded"}
+              <div className="section-title">Bill To</div>
+              <div className="value">{customerName}</div>
+              {customerPhone && <div className="value">{customerPhone}</div>}
+              {customerEmail && <div className="value">{customerEmail}</div>}
+            </div>
+
+            <div>
+              <div className="section-title">Vehicle</div>
+              <div className="value">{vehicleText}</div>
+              {receipt.installer && (
+                <div className="value">Installer: {receipt.installer.name}</div>
+              )}
             </div>
           </div>
 
           {/* ITEMS */}
-          <div className="mb-8">
-            <div className="font-semibold mb-2">
-              Item / Service Description
-            </div>
-
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr style={{ background: "#8757b1", color: "white" }}>
-                  <th className="p-2 text-left">#</th>
-                  <th className="p-2 text-left">Description</th>
-                  <th className="p-2 text-center">Serial</th>
-                  <th className="p-2 text-center">Qty</th>
-                  <th className="p-2 text-right">Unit</th>
-                  <th className="p-2 text-right">Total</th>
+          <div className="items-title">Items</div>
+          <table className="items-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Qty</th>
+                <th align="right">Price</th>
+                <th align="right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {receipt.items?.map((i) => (
+                <tr key={i.cartId || i.productId}>
+                  <td>
+                    {i.name}
+                    {i.sku && <div className="desc-sub">SKU: {i.sku}</div>}
+                  </td>
+                  <td>{i.qty}</td>
+                  <td align="right">${Number(i.price).toFixed(2)}</td>
+                  <td align="right">${(i.price * i.qty).toFixed(2)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {receipt.items?.map((item, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="p-2">{i + 1}</td>
-                    <td className="p-2">{item.name}</td>
-                    <td className="p-2 text-center">{item.serial || "—"}</td>
-                    <td className="p-2 text-center">{item.qty}</td>
-                    <td className="p-2 text-right">{money(item.price)}</td>
-                    <td className="p-2 text-right">
-                      {money(item.qty * item.price)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
 
           {/* TOTALS */}
-          <div className="grid grid-cols-2 gap-8 text-sm">
-            <div>
-              <div className="font-semibold">Payment Method</div>
-              <div>{receipt.paymentMethod || "CARD"}</div>
+          <div className="bottom-section">
+
+            {/* PAYMENT */}
+            <div className="payment-block">
+              <div className="section-title">Payment</div>
+              <div className="value">Method: {paymentMethod}</div>
+              {last4 && <div className="value">Card: •••• {last4}</div>}
             </div>
 
-            <div>
-              <div className="flex justify-between">
+            {/* TOTALS */}
+            <div className="totals-block">
+              <div className="totals-row">
                 <span>Subtotal</span>
-                <span>{money(receipt.subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Discount</span>
-                <span>{money(receipt.discount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax</span>
-                <span>{money(receipt.tax)}</span>
+                <span>${subtotal.toFixed(2)}</span>
               </div>
 
-              <div
-                className="flex justify-between mt-3 px-3 py-2 text-white font-bold"
-                style={{ background: "#8757b1" }}
-              >
+              {discountAmount > 0 && (
+                <div className="totals-row">
+                  <span>{discountLabel}</span>
+                  <span>- ${discountAmount.toFixed(2)}</span>
+                </div>
+              )}
+
+              <div className="totals-row">
+                <span>Tax</span>
+                <span>${tax.toFixed(2)}</span>
+              </div>
+
+              <div className="totals-row grand-total">
                 <span>Total</span>
-                <span>{money(receipt.total)}</span>
+                <span>${finalTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          {/* FOOTER */}
-          <div className="text-center text-sm mt-12">
-            {template.footerText || "Thank you for choosing Sound Depot!"}
+          <div className="footer-text">
+            Thank you for your business!
           </div>
         </div>
       </div>

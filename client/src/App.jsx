@@ -12,7 +12,7 @@ import {
 } from "firebase/auth";
 
 import { auth } from "./firebase";
-
+import HeldReceipts from "./pages/HeldReceipts";
 /* ================= PAGES ================= */
 import Sell from "./pages/Sell";
 import Inventory from "./pages/Inventory";
@@ -170,7 +170,7 @@ export default function App() {
             <Route path="/sell" element={<Sell />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/inventory/check-in" element={<ProductCheckIn />} />
-
+            <Route path="/held-receipts" element={<HeldReceipts />} />
             {/* SETTINGS */}
             <Route
               path="/settings"

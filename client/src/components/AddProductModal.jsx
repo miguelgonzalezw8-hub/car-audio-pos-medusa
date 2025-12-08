@@ -10,6 +10,17 @@ import {
   orderBy
 } from "firebase/firestore";
 
+const SPEAKER_SIZES = [
+  "2.75",
+  "3.5",
+  "4",
+  "5.25",
+  "6.5",
+  "6x8",
+  "6x9",
+  "8"
+];
+
 export default function AddProductModal({
   isOpen,
   onClose,
@@ -19,9 +30,11 @@ export default function AddProductModal({
   const [form, setForm] = useState({
     name: "",
     sku: "",
+    barcode: "",       // ✅ ADDED
     brand: "",
     subBrand: "",
     category: "",
+    speakerSize: "",   // ✅ ADDED (safe flat field)
     cost: "",
     price: "",
     stock: ""
@@ -31,34 +44,37 @@ export default function AddProductModal({
   const [subbrands, setSubbrands] = useState([]);
   const [showSubbrand, setShowSubbrand] = useState(false);
 
-  // ---------------------------------
-  // Load brands from Firestore
-  // ---------------------------------
+  /* -------------------------------
+     Load brands from Firestore
+  -------------------------------- */
   useEffect(() => {
     const q = query(collection(db, "brands"), orderBy("brandName"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setBrands(list);
+      setBrands(
+        snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+      );
     });
 
     return () => unsubscribe();
   }, []);
 
-  // ---------------------------------
-  // Preload form when editing
-  // ---------------------------------
+  /* -------------------------------
+     Preload form when editing
+  -------------------------------- */
   useEffect(() => {
     if (editingItem) {
       setForm({
         name: editingItem.name || "",
         sku: editingItem.sku || "",
+        barcode: editingItem.barcode || "",     // ✅ SAFE
         brand: editingItem.brand || "",
         subBrand: editingItem.subBrand || "",
         category: editingItem.category || "",
+        speakerSize: editingItem.speakerSize || "", // ✅ SAFE
         cost: editingItem.cost || "",
         price: editingItem.price || "",
         stock: editingItem.stock || ""
@@ -75,9 +91,11 @@ export default function AddProductModal({
       setForm({
         name: "",
         sku: "",
+        barcode: "",
         brand: "",
         subBrand: "",
         category: "",
+        speakerSize: "",
         cost: "",
         price: "",
         stock: ""
@@ -86,9 +104,9 @@ export default function AddProductModal({
     }
   }, [editingItem, brands]);
 
-  // ---------------------------------
-  // Handle brand change
-  // ---------------------------------
+  /* -------------------------------
+     Handle brand change
+  -------------------------------- */
   const handleBrandChange = (value) => {
     setForm(prev => ({
       ...prev,
@@ -98,7 +116,7 @@ export default function AddProductModal({
 
     const brand = brands.find(b => b.brandName === value);
 
-    if (brand && brand.enableSubbrands) {
+    if (brand?.enableSubbrands) {
       setSubbrands(brand.subbrands || []);
       setShowSubbrand(true);
     } else {
@@ -136,13 +154,20 @@ export default function AddProductModal({
           />
 
           <input
+            name="barcode"
+            placeholder="Barcode (scan or type)"   // ✅ NEW
+            value={form.barcode}
+            onChange={handleChange}
+          />
+
+          <input
             name="name"
             placeholder="Product Name"
             value={form.name}
             onChange={handleChange}
           />
 
-          {/* BRAND DROPDOWN */}
+          {/* BRAND */}
           <select
             value={form.brand}
             onChange={(e) => handleBrandChange(e.target.value)}
@@ -155,7 +180,7 @@ export default function AddProductModal({
             ))}
           </select>
 
-          {/* SUB-BRAND DROPDOWN (conditional) */}
+          {/* SUB-BRAND */}
           {showSubbrand && (
             <select
               name="subBrand"
@@ -177,6 +202,22 @@ export default function AddProductModal({
             value={form.category}
             onChange={handleChange}
           />
+
+          {/* ✅ CONDITIONAL SPEAKER SIZE */}
+          {form.category === "Speakers" && (
+            <select
+              name="speakerSize"
+              value={form.speakerSize}
+              onChange={handleChange}
+            >
+              <option value="">Speaker Size</option>
+              {SPEAKER_SIZES.map(size => (
+                <option key={size} value={size}>
+                  {size}"
+                </option>
+              ))}
+            </select>
+          )}
 
           <input
             type="number"
