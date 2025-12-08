@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import VehicleFitment from "../components/VehicleFitment";
 import CheckoutModal from "../components/CheckoutModal";
 import { db } from "../firebase";
@@ -21,20 +21,30 @@ const formatPhone = (v) => {
 };
 
 export default function Sell() {
-  /* ================= STATE ================= */
+  /* ================= CORE STATE ================= */
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [installer, setInstaller] = useState(null);
 
+  const [appointment, setAppointment] = useState({
+    date: null,
+    startTime: "",
+    endTime: "",
+  });
+
+  /* ================= DATA ================= */
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
 
+  /* ================= SEARCH ================= */
   const [search, setSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
 
+  /* ================= CART ================= */
   const [cart, setCart] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
+  /* ================= ADD CUSTOMER ================= */
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     firstName: "",
@@ -79,7 +89,7 @@ export default function Sell() {
             .includes(customerSearch.toLowerCase())
         );
 
-  /* ================= CART ================= */
+  /* ================= CART LOGIC ================= */
   const addToCart = (product, source = "search") => {
     setCart((prev) => [
       ...prev,
@@ -107,6 +117,7 @@ export default function Sell() {
     );
   };
 
+  /* ================= TOTALS ================= */
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const taxRate = selectedCustomer?.type === "Wholesale" ? 0 : 0.095;
   const tax = subtotal * taxRate;
@@ -119,12 +130,13 @@ export default function Sell() {
       phoneRaw: newCustomer.phone.replace(/\D/g, ""),
       createdAt: serverTimestamp(),
     });
+
     setSelectedCustomer({ id: ref.id, ...newCustomer });
     setCustomerSearch("");
     setShowAddCustomer(false);
   };
 
-  /* ================= QUOTES ================= */
+  /* ================= SAVE QUOTE ================= */
   const saveQuote = async (print) => {
     const payload = {
       type: "quote",
@@ -133,6 +145,8 @@ export default function Sell() {
       vehicle: selectedVehicle,
       items: cart,
       totals: { subtotal, tax, total },
+      installer,
+      appointment,
     };
 
     const ref = await addDoc(collection(db, "quotes"), payload);
@@ -157,9 +171,12 @@ export default function Sell() {
       payment,
       items: cart,
       totals: { subtotal, tax, total },
+      installer,
+      appointment,
     };
 
     const ref = await addDoc(collection(db, "sales"), payload);
+
     localStorage.setItem(
       "currentReceipt",
       JSON.stringify({ ...payload, id: ref.id })
@@ -174,13 +191,11 @@ export default function Sell() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      {/* VEHICLE FITMENT */}
       <VehicleFitment
         onVehicleSelected={setSelectedVehicle}
         onAddProduct={(p) => addToCart(p, "fitment")}
       />
 
-      {/* ================= CART PANEL ================= */}
       <div className="bg-white p-4 rounded-xl shadow border flex flex-col">
 
         {/* PRODUCT SEARCH */}
@@ -199,7 +214,7 @@ export default function Sell() {
               {filteredProducts.map((p) => (
                 <div
                   key={p.id}
-                  onMouseDown={() => addToCart(p, "search")}
+                  onMouseDown={() => addToCart(p)}
                   className="px-3 py-2 cursor-pointer hover:bg-gray-100"
                 >
                   <div className="font-medium">{p.name}</div>
@@ -215,7 +230,7 @@ export default function Sell() {
         {/* CUSTOMER SEARCH */}
         <div className="mt-4 relative">
           <input
-            placeholder="Search customer (name, phone, email)…"
+            placeholder="Search customer…"
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
             className="w-full h-11 px-3 rounded-lg border
@@ -253,7 +268,6 @@ export default function Sell() {
           </button>
         </div>
 
-        {/* SELECTED CUSTOMER DISPLAY */}
         {selectedCustomer && (
           <div className="mt-3 rounded-lg border bg-blue-50 p-3 text-sm">
             👤 <strong>{selectedCustomer.firstName} {selectedCustomer.lastName}</strong>
@@ -268,76 +282,19 @@ export default function Sell() {
           </div>
         )}
 
-        {/* ADD CUSTOMER FORM */}
-        {showAddCustomer && (
-          <div className="mt-3 p-3 border rounded bg-gray-50 space-y-2">
-            <input
-              placeholder="First name"
-              className="w-full px-2 py-1 border rounded"
-              onChange={(e) =>
-                setNewCustomer({ ...newCustomer, firstName: e.target.value })
-              }
-            />
-            <input
-              placeholder="Last name"
-              className="w-full px-2 py-1 border rounded"
-              onChange={(e) =>
-                setNewCustomer({ ...newCustomer, lastName: e.target.value })
-              }
-            />
-            <input
-              placeholder="Phone"
-              value={newCustomer.phone}
-              className="w-full px-2 py-1 border rounded"
-              onChange={(e) =>
-                setNewCustomer({
-                  ...newCustomer,
-                  phone: formatPhone(e.target.value),
-                })
-              }
-            />
-            <input
-              placeholder="Email"
-              className="w-full px-2 py-1 border rounded"
-              onChange={(e) =>
-                setNewCustomer({ ...newCustomer, email: e.target.value })
-              }
-            />
-            <button
-              onClick={saveCustomer}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg"
-            >
-              Save Customer
-            </button>
-          </div>
-        )}
-
         {/* CART */}
         <div className="flex-1 mt-4 overflow-y-auto border-t pt-2">
           {cart.map((i) => (
-            <div key={i.cartId} className="border-b py-2 space-y-1 text-sm">
+            <div key={i.cartId} className="border-b py-2 text-sm">
               <div className="flex justify-between">
                 <span>{i.name}</span>
                 <span>${(i.price * i.qty).toFixed(2)}</span>
               </div>
-
-              {i.source === "fitment" && (
-                <input
-                  placeholder="Scan serial number"
-                  className="w-full px-2 py-1 border rounded text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && e.target.value.trim()) {
-                      addSerial(i.cartId, e.target.value.trim());
-                      e.target.value = "";
-                    }
-                  }}
-                />
-              )}
             </div>
           ))}
         </div>
 
-        {/* TOTALS & ACTIONS */}
+        {/* TOTALS */}
         <div className="border-t pt-3 space-y-3">
           <div className="flex justify-between font-semibold">
             <span>Total</span>
@@ -350,27 +307,9 @@ export default function Sell() {
           >
             ✅ Checkout
           </button>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => saveQuote(false)}
-              className="bg-white border py-2 rounded-lg"
-            >
-              💾 Save Quote
-            </button>
-
-            <button
-              onClick={() => saveQuote(true)}
-              className="bg-blue-600 text-white py-2 rounded-lg"
-            >
-              🖨 Print Quote
-            </button>
-          </div>
         </div>
-
       </div>
 
-      {/* CHECKOUT MODAL */}
       <CheckoutModal
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}

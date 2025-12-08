@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 
 export default function Settings({ darkMode, setDarkMode }) {
@@ -11,7 +10,7 @@ export default function Settings({ darkMode, setDarkMode }) {
 
       {/* ======================
           APPEARANCE / DARK MODE
-         ====================== */}
+      ====================== */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-3">
 
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
@@ -46,15 +45,27 @@ export default function Settings({ darkMode, setDarkMode }) {
       </div>
 
       {/* ======================
-          RECEIPT SETTINGS
-         ====================== */}
-      <Link
-        to="/settings/receipt"
-        className="block p-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full transition"
-      >
-        Receipt Editor
-      </Link>
+          SYSTEM SETTINGS
+      ====================== */}
+      <div className="space-y-3">
 
+        {/* ✅ KEEP RECEIPT EDITOR */}
+        <Link
+          to="/settings/receipt"
+          className="block p-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+        >
+          🧾 Receipt Editor
+        </Link>
+
+        {/* ✅ NEW: INSTALLERS */}
+        <Link
+          to="/settings/installers"
+          className="block p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold transition"
+        >
+          👨‍🔧 Installers
+        </Link>
+
+      </div>
     </div>
   );
 }

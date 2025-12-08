@@ -1,17 +1,29 @@
 // src/App.jsx
+import { useState, useEffect } from "react";
+import {
+  Routes,
+  Route,
+  NavLink,
+  useLocation,
+} from "react-router-dom";
+import {
+  onAuthStateChanged,
+  getIdTokenResult,
+} from "firebase/auth";
+
 import { auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import Login from "./components/Login";
-import React, { useState, useEffect } from "react";
-import { Routes, Route, NavLink, useLocation } from "react-router-dom";
+
+/* ================= PAGES ================= */
 import Sell from "./pages/Sell";
 import Inventory from "./pages/Inventory";
+import ProductCheckIn from "./pages/ProductCheckIn";
 import Settings from "./pages/Settings";
 import ReceiptEditor from "./pages/ReceiptEditor";
 import ReceiptPrint from "./pages/ReceiptPrint";
-import ProductCheckIn from "./pages/ProductCheckIn";
+import Installers from "./pages/Installers";
+import Login from "./components/Login";
 
-// Simple placeholder for now
+/* ================= DASHBOARD ================= */
 function Dashboard() {
   return (
     <div className="text-2xl font-bold text-slate-800 dark:text-slate-100">
@@ -20,33 +32,50 @@ function Dashboard() {
   );
 }
 
+/* ================= NAV ================= */
 const navItems = [
   { label: "Dashboard", to: "/" },
   { label: "Sell", to: "/sell" },
   { label: "Inventory", to: "/inventory" },
   { label: "Settings", to: "/settings" },
 ];
-const [user, setUser] = useState(null);
-const [authReady, setAuthReady] = useState(false);
 
 export default function App() {
   const location = useLocation();
   const hideLayout = location.pathname === "/print-receipt";
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    setUser(currentUser);
-    setAuthReady(true);
-  });
 
-  return () => unsubscribe();
-}, []);
+  /* ================= AUTH STATE ================= */
+  const [authReady, setAuthReady] = useState(false);
+  const [user, setUser] = useState(null);
 
-  // ✅ GLOBAL DARK MODE STATE (read once)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) {
+        setUser(null);
+        setAuthReady(true);
+        return;
+      }
+
+      // ✅ pull custom claims (role)
+      const token = await getIdTokenResult(currentUser);
+
+      setUser({
+        uid: currentUser.uid,
+        email: currentUser.email,
+        role: token.claims.role || "user",
+      });
+
+      setAuthReady(true);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  /* ================= DARK MODE ================= */
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("theme") === "dark";
   });
 
-  // ✅ APPLY DARK MODE TO <html>
   useEffect(() => {
     const html = document.documentElement;
 
@@ -60,22 +89,29 @@ useEffect(() => {
 
     localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]);
-if (!authReady) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200">
-      Loading...
-    </div>
-  );
-}
 
-if (!user) {
-  return <Login />;
-}
+  /* ================= LOADING / AUTH ================= */
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-200">
+        Loading...
+      </div>
+    );
+  }
 
+  if (!user) {
+    return <Login />;
+  }
 
+  /* ================= ROLE CHECK ================= */
+  const isManager =
+    user.role === "owner" || user.role === "manager";
+
+  /* ================= APP ================= */
   return (
     <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950">
-      {/* ================= SIDEBAR ================= */}
+
+      {/* ========== SIDEBAR ========== */}
       {!hideLayout && (
         <aside className="w-60 bg-slate-900 text-slate-100 flex flex-col">
           <div className="px-4 py-5 border-b border-slate-800">
@@ -109,8 +145,9 @@ if (!user) {
         </aside>
       )}
 
-      {/* ================= MAIN ================= */}
+      {/* ========== MAIN ========== */}
       <div className="flex-1 flex flex-col">
+
         {/* HEADER */}
         {!hideLayout && (
           <header className="h-14 flex items-center px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -126,32 +163,38 @@ if (!user) {
           </header>
         )}
 
-        {/* PAGE CONTENT */}
+        {/* CONTENT */}
         <main className={`flex-1 ${hideLayout ? "" : "p-6"}`}>
           <Routes>
-  <Route path="/" element={<Dashboard />} />
-  <Route path="/sell" element={<Sell />} />
-  <Route path="/inventory" element={<Inventory />} />
-  <Route path="/inventory/check-in" element={<ProductCheckIn />} />
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/sell" element={<Sell />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/inventory/check-in" element={<ProductCheckIn />} />
 
-  {/* ✅ MUST COME FIRST */}
-  <Route
-  path="/settings/receipt"
-  element={<ReceiptEditor key="receipt-editor" />}
-/>
+            {/* SETTINGS */}
+            <Route
+              path="/settings"
+              element={
+                <Settings
+                  user={user}
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                />
+              }
+            />
+
+            <Route path="/settings/receipt" element={<ReceiptEditor />} />
+
+            {/* ✅ ROLE-RESTRICTED PAGE */}
+            <Route
+               path="/settings/installers"
+               element={<Installers user={user} />}
+              />
 
 
-  <Route
-    path="/settings"
-    element={<Settings darkMode={darkMode} setDarkMode={setDarkMode} />}
-  />
-
-  <Route
-  path="/print-receipt"
-  element={<ReceiptPrint key="receipt-print" />}
-/>
-</Routes>
-
+            {/* PRINT */}
+            <Route path="/print-receipt" element={<ReceiptPrint />} />
+          </Routes>
         </main>
       </div>
     </div>

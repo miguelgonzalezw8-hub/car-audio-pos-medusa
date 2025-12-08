@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from "react";
-
+import { useState, useMemo } from "react";
 import visa from "../assets/cc/visa.svg";
 import mastercard from "../assets/cc/mastercard.svg";
 import amex from "../assets/cc/amex.svg";

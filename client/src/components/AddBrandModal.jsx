@@ -1,5 +1,5 @@
 // src/components/AddBrandModal.jsx
-import React, { useState } from "react";
+import { useState } from "react";
 import "./AddProductModal.css"; // reuse same modal styles
 import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
