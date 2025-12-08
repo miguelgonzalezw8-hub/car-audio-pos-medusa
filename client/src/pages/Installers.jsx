@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
-import { db } from "../firebase";
 import {
   collection,
   addDoc,
-  updateDoc,
   onSnapshot,
-  doc,
   serverTimestamp,
 } from "firebase/firestore";
+import { db } from "../firebase";
 
-/* ================= CONFIG ================= */
+/* ================= DEFAULT DATA ================= */
 
 const INSTALLER_TYPES = [
   "Basic",
@@ -21,127 +19,194 @@ const INSTALLER_TYPES = [
   "Marine",
 ];
 
-const MECP_CERTS = [
+const DEFAULT_CERTIFICATIONS = [
+  // MECP
   "MECP Basic",
   "MECP Advanced",
   "MECP Master",
+
+  // Remote Start / Security
+  "Compustar Pro",
+  "Directed SmartStart",
+  "iDatalink Maestro",
+
+  // Tint
+  "Llumar Certified",
+  "3M Authorized Installer",
+  "XPEL Certified",
+
+  // Marine
+  "JL Audio Marine Certified",
+  "Fusion Marine Certified",
+
+  // Misc
+  "ADAS Calibration",
+  "OEM Integration Specialist",
 ];
 
-/* ================= PAGE ================= */
+/* ================= COMPONENT ================= */
 
-export default function Installers() {
+export default function Installers({ user }) {
+  if (!user || (user.role !== "owner" && user.role !== "manager")) {
+    return (
+      <div className="p-6 text-red-600 font-semibold">
+        No access to installer settings.
+      </div>
+    );
+  }
+
+  /* ================= STATE ================= */
+
   const [installers, setInstallers] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
 
-  /* ADD FORM */
   const [name, setName] = useState("");
   const [types, setTypes] = useState([]);
-  const [certEnabled, setCertEnabled] = useState(false);
-  const [certs, setCerts] = useState([]);
-  const [selectedCert, setSelectedCert] = useState("");
-
-  const [payModel, setPayModel] = useState("hourly");
+  const [payType, setPayType] = useState("hourly");
   const [hourlyRate, setHourlyRate] = useState("");
-  const [commissionPercent, setCommissionPercent] = useState("");
+  const [commissionRate, setCommissionRate] = useState("");
   const [rentDue, setRentDue] = useState("");
-  const [flatRate, setFlatRate] = useState("");
 
-  /* ================= LOAD ================= */
+  const [certEnabled, setCertEnabled] = useState(false);
+  const [installerCerts, setInstallerCerts] = useState([]);
+  const [allCerts, setAllCerts] = useState(DEFAULT_CERTIFICATIONS);
+  const [selectedCert, setSelectedCert] = useState("");
+  const [newCert, setNewCert] = useState("");
+
+  /* ================= LOAD INSTALLERS ================= */
+
   useEffect(() => {
-    return onSnapshot(collection(db, "installers"), (snap) =>
-      setInstallers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    const unsub = onSnapshot(collection(db, "installers"), (snap) => {
+      setInstallers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
   }, []);
 
-  const selectedInstaller = installers.find(
-    (i) => i.id === selectedId
-  );
+  /* ================= SAVE INSTALLER ================= */
 
-  /* ================= SAVE ================= */
-
-  const resetForm = () => {
-    setName("");
-    setTypes([]);
-    setCertEnabled(false);
-    setCerts([]);
-    setSelectedCert("");
-    setPayModel("hourly");
-    setHourlyRate("");
-    setCommissionPercent("");
-    setRentDue("");
-    setFlatRate("");
-  };
-
-  const addInstaller = async () => {
+  const saveInstaller = async () => {
     if (!name) return alert("Installer name required");
 
     await addDoc(collection(db, "installers"), {
       name,
       types,
-      certifications: certEnabled ? certs : [],
-      payModel,
-      hourlyRate: payModel === "hourly" ? Number(hourlyRate) : null,
-      commissionPercent:
-        payModel === "commission" ? Number(commissionPercent) : null,
-      rentDue:
-        payModel === "commission" ? Number(rentDue) : null,
-      flatRate: payModel === "flat" ? Number(flatRate) : null,
+      pay: {
+        type: payType,
+        hourlyRate: payType === "hourly" ? Number(hourlyRate) : null,
+        commissionRate:
+          payType === "commission" ? Number(commissionRate) : null,
+        rentDue: payType === "commission" ? Number(rentDue) : null,
+      },
+      certifications: certEnabled ? installerCerts : [],
       active: true,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
     });
 
-    resetForm();
+    // reset
+    setName("");
+    setTypes([]);
+    setPayType("hourly");
+    setHourlyRate("");
+    setCommissionRate("");
+    setRentDue("");
+    setInstallerCerts([]);
+    setCertEnabled(false);
   };
 
   /* ================= UI ================= */
 
   return (
-    <div className="max-w-5xl space-y-6">
-
-      <h1 className="text-2xl font-bold">Installers</h1>
+    <div className="max-w-4xl mx-auto space-y-8">
+      <h1 className="text-2xl font-bold">🛠 Installer Management</h1>
 
       {/* ================= ADD INSTALLER ================= */}
-      <div className="bg-white dark:bg-slate-900 border rounded-xl p-5 space-y-4">
-
-        <h2 className="font-semibold">Add Installer</h2>
+      <div className="bg-white border rounded-lg p-4 space-y-4">
+        <h2 className="font-semibold text-lg">Add Installer</h2>
 
         <input
           placeholder="Installer Name"
+          className="w-full border px-3 py-2 rounded"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full border px-3 py-2 rounded"
         />
 
-        {/* TYPES */}
-        <div className="grid grid-cols-2 gap-2">
-          {INSTALLER_TYPES.map((t) => (
-            <label key={t} className="flex gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={types.includes(t)}
-                onChange={() =>
+        {/* INSTALLER TYPES */}
+        <div>
+          <label className="text-sm font-medium">Installer Type(s)</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {INSTALLER_TYPES.map((t) => (
+              <button
+                key={t}
+                onClick={() =>
                   setTypes((prev) =>
                     prev.includes(t)
                       ? prev.filter((x) => x !== t)
                       : [...prev, t]
                   )
                 }
-              />
-              {t}
-            </label>
-          ))}
+                className={`px-3 py-1 rounded border text-sm ${
+                  types.includes(t)
+                    ? "bg-blue-600 text-white"
+                    : "bg-white"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* CERTS */}
+        {/* PAY STRUCTURE */}
         <div className="space-y-2">
-          <label className="flex gap-2 text-sm">
+          <label className="text-sm font-medium">Pay Structure</label>
+
+          <select
+            value={payType}
+            onChange={(e) => setPayType(e.target.value)}
+            className="border px-3 py-2 rounded w-full"
+          >
+            <option value="hourly">Hourly</option>
+            <option value="commission">Commission</option>
+          </select>
+
+          {payType === "hourly" && (
+            <input
+              type="number"
+              placeholder="Hourly Rate"
+              className="border px-3 py-2 rounded w-full"
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(e.target.value)}
+            />
+          )}
+
+          {payType === "commission" && (
+            <>
+              <input
+                type="number"
+                placeholder="Commission %"
+                className="border px-3 py-2 rounded w-full"
+                value={commissionRate}
+                onChange={(e) => setCommissionRate(e.target.value)}
+              />
+              <input
+                type="number"
+                placeholder="Weekly / Monthly Rent Due"
+                className="border px-3 py-2 rounded w-full"
+                value={rentDue}
+                onChange={(e) => setRentDue(e.target.value)}
+              />
+            </>
+          )}
+        </div>
+
+        {/* CERTIFICATIONS */}
+        <div className="space-y-2">
+          <label className="flex gap-2 text-sm font-medium">
             <input
               type="checkbox"
               checked={certEnabled}
               onChange={() => setCertEnabled(!certEnabled)}
             />
-            MECP Certified
+            Certifications
           </label>
 
           {certEnabled && (
@@ -153,7 +218,7 @@ export default function Installers() {
                   className="border px-3 py-2 rounded w-full"
                 >
                   <option value="">Select certification</option>
-                  {MECP_CERTS.map((c) => (
+                  {allCerts.map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </select>
@@ -162,19 +227,42 @@ export default function Installers() {
                   onClick={() => {
                     if (
                       selectedCert &&
-                      !certs.includes(selectedCert)
+                      !installerCerts.includes(selectedCert)
                     ) {
-                      setCerts([...certs, selectedCert]);
+                      setInstallerCerts([
+                        ...installerCerts,
+                        selectedCert,
+                      ]);
                     }
                   }}
-                  className="px-3 py-2 border rounded"
+                  className="border px-3 rounded"
                 >
                   Add
                 </button>
               </div>
 
+              <div className="flex gap-2">
+                <input
+                  placeholder="Add new certification"
+                  className="border px-3 py-2 rounded w-full"
+                  value={newCert}
+                  onChange={(e) => setNewCert(e.target.value)}
+                />
+                <button
+                  onClick={() => {
+                    if (newCert && !allCerts.includes(newCert)) {
+                      setAllCerts([...allCerts, newCert]);
+                      setNewCert("");
+                    }
+                  }}
+                  className="border px-3 rounded"
+                >
+                  +
+                </button>
+              </div>
+
               <div className="flex flex-wrap gap-2 text-xs">
-                {certs.map((c) => (
+                {installerCerts.map((c) => (
                   <span
                     key={c}
                     className="px-2 py-1 bg-blue-100 text-blue-700 rounded"
@@ -187,97 +275,34 @@ export default function Installers() {
           )}
         </div>
 
-        {/* PAY MODEL */}
-        <select
-          value={payModel}
-          onChange={(e) => setPayModel(e.target.value)}
-          className="border px-3 py-2 rounded w-full"
-        >
-          <option value="hourly">Hourly Labor</option>
-          <option value="commission">Commission</option>
-          <option value="flat">Flat Rate</option>
-        </select>
-
-        {payModel === "hourly" && (
-          <input
-            type="number"
-            placeholder="Hourly Rate"
-            value={hourlyRate}
-            onChange={(e) => setHourlyRate(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-          />
-        )}
-
-        {payModel === "commission" && (
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              placeholder="Commission %"
-              value={commissionPercent}
-              onChange={(e) => setCommissionPercent(e.target.value)}
-              className="border px-3 py-2 rounded"
-            />
-            <input
-              type="number"
-              placeholder="Monthly Rent Due"
-              value={rentDue}
-              onChange={(e) => setRentDue(e.target.value)}
-              className="border px-3 py-2 rounded"
-            />
-          </div>
-        )}
-
-        {payModel === "flat" && (
-          <input
-            type="number"
-            placeholder="Flat Rate per Job"
-            value={flatRate}
-            onChange={(e) => setFlatRate(e.target.value)}
-            className="w-full border px-3 py-2 rounded"
-          />
-        )}
-
         <button
-          onClick={addInstaller}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+          onClick={saveInstaller}
+          className="bg-green-600 text-white px-4 py-2 rounded font-semibold"
         >
-          Add Installer
+          ✅ Save Installer
         </button>
       </div>
 
-      {/* ================= SELECT / VIEW ================= */}
-      <div className="bg-white dark:bg-slate-900 border rounded-xl p-5 space-y-3">
-        <h2 className="font-semibold">Existing Installers</h2>
+      {/* ================= LIST ================= */}
+      <div className="bg-white border rounded-lg p-4">
+        <h2 className="font-semibold mb-3">
+          Installers ({installers.length})
+        </h2>
 
-        <select
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          className="border px-3 py-2 rounded w-full"
-        >
-          <option value="">Select installer</option>
+        <div className="space-y-2 text-sm">
           {installers.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.name}
-            </option>
+            <div key={i.id} className="border p-3 rounded">
+              <div className="font-semibold">{i.name}</div>
+              <div>Types: {i.types?.join(", ")}</div>
+              <div>Pay: {i.pay?.type}</div>
+              {i.certifications?.length > 0 && (
+                <div>
+                  Certs: {i.certifications.join(", ")}
+                </div>
+              )}
+            </div>
           ))}
-        </select>
-
-        {selectedInstaller && (
-          <div className="text-sm text-gray-600 space-y-1">
-            <div>Pay Model: {selectedInstaller.payModel}</div>
-            {selectedInstaller.hourlyRate && (
-              <div>Hourly: ${selectedInstaller.hourlyRate}</div>
-            )}
-            {selectedInstaller.commissionPercent && (
-              <div>
-                Commission: {selectedInstaller.commissionPercent}%
-              </div>
-            )}
-            {selectedInstaller.rentDue && (
-              <div>Rent Due: ${selectedInstaller.rentDue}</div>
-            )}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
