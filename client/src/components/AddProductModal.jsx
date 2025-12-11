@@ -7,7 +7,7 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
 } from "firebase/firestore";
 
 const SPEAKER_SIZES = [
@@ -18,26 +18,26 @@ const SPEAKER_SIZES = [
   "6.5",
   "6x8",
   "6x9",
-  "8"
+  "8",
 ];
 
 export default function AddProductModal({
   isOpen,
   onClose,
   onSave,
-  editingItem
+  editingItem,
 }) {
   const [form, setForm] = useState({
     name: "",
     sku: "",
-    barcode: "",       // ✅ ADDED
+    barcode: "",
     brand: "",
     subBrand: "",
     category: "",
-    speakerSize: "",   // ✅ ADDED (safe flat field)
+    speakerSize: "",
     cost: "",
     price: "",
-    stock: ""
+    stock: "",
   });
 
   const [brands, setBrands] = useState([]);
@@ -54,7 +54,7 @@ export default function AddProductModal({
       setBrands(
         snapshot.docs.map((doc) => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
         }))
       );
     });
@@ -70,17 +70,19 @@ export default function AddProductModal({
       setForm({
         name: editingItem.name || "",
         sku: editingItem.sku || "",
-        barcode: editingItem.barcode || "",     // ✅ SAFE
+        barcode: editingItem.barcode || "",
         brand: editingItem.brand || "",
         subBrand: editingItem.subBrand || "",
         category: editingItem.category || "",
-        speakerSize: editingItem.speakerSize || "", // ✅ SAFE
+        speakerSize: editingItem.speakerSize || "",
         cost: editingItem.cost || "",
         price: editingItem.price || "",
-        stock: editingItem.stock || ""
+        stock: editingItem.stock || "",
       });
 
-      const brand = brands.find(b => b.brandName === editingItem.brand);
+      const brand = brands.find(
+        (b) => b.brandName === editingItem.brand
+      );
       if (brand?.enableSubbrands) {
         setSubbrands(brand.subbrands || []);
         setShowSubbrand(true);
@@ -98,7 +100,7 @@ export default function AddProductModal({
         speakerSize: "",
         cost: "",
         price: "",
-        stock: ""
+        stock: "",
       });
       setShowSubbrand(false);
     }
@@ -108,13 +110,13 @@ export default function AddProductModal({
      Handle brand change
   -------------------------------- */
   const handleBrandChange = (value) => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
       brand: value,
-      subBrand: ""
+      subBrand: "",
     }));
 
-    const brand = brands.find(b => b.brandName === value);
+    const brand = brands.find((b) => b.brandName === value);
 
     if (brand?.enableSubbrands) {
       setSubbrands(brand.subbrands || []);
@@ -126,21 +128,33 @@ export default function AddProductModal({
   };
 
   const handleChange = (e) => {
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
   const handleSubmit = () => {
-    onSave(form);
+    const finalForm = {
+      ...form,
+      // Used for Firestore fitment matching
+      speakerSizes:
+        form.speakerSize && form.speakerSize.length > 0
+          ? [form.speakerSize]
+          : [],
+    };
+
+    onSave(finalForm);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-box"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="modal-title">
           {editingItem ? "Edit Product" : "Add Product"}
         </h2>
@@ -155,7 +169,7 @@ export default function AddProductModal({
 
           <input
             name="barcode"
-            placeholder="Barcode (scan or type)"   // ✅ NEW
+            placeholder="Barcode (scan or type)"
             value={form.barcode}
             onChange={handleChange}
           />
@@ -173,7 +187,7 @@ export default function AddProductModal({
             onChange={(e) => handleBrandChange(e.target.value)}
           >
             <option value="">Select Brand</option>
-            {brands.map(b => (
+            {brands.map((b) => (
               <option key={b.id} value={b.brandName}>
                 {b.brandName}
               </option>
@@ -203,7 +217,7 @@ export default function AddProductModal({
             onChange={handleChange}
           />
 
-          {/* ✅ CONDITIONAL SPEAKER SIZE */}
+          {/* CONDITIONAL SPEAKER SIZE */}
           {form.category === "Speakers" && (
             <select
               name="speakerSize"
@@ -211,7 +225,7 @@ export default function AddProductModal({
               onChange={handleChange}
             >
               <option value="">Speaker Size</option>
-              {SPEAKER_SIZES.map(size => (
+              {SPEAKER_SIZES.map((size) => (
                 <option key={size} value={size}>
                   {size}"
                 </option>

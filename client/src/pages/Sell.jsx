@@ -37,27 +37,27 @@ export default function Sell() {
   useEffect(() => {
     return onSnapshot(
       query(collection(db, "products"), where("active", "==", true)),
-      (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) =>
+        setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
   }, []);
 
   useEffect(() => {
-    return onSnapshot(collection(db, "customers"), snap =>
-      setCustomers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    return onSnapshot(collection(db, "customers"), (snap) =>
+      setCustomers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
   }, []);
 
   useEffect(() => {
-    return onSnapshot(collection(db, "installers"), snap =>
+    return onSnapshot(collection(db, "installers"), (snap) =>
       setInstallers(
-        snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => i.active)
+        snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((i) => i.active)
       )
     );
   }, []);
 
-  /* ================= HELD RECEIPTS COUNT ================= */
   useEffect(() => {
-    return onSnapshot(collection(db, "heldReceipts"), snap =>
+    return onSnapshot(collection(db, "heldReceipts"), (snap) =>
       setHeldCount(snap.size)
     );
   }, []);
@@ -76,19 +76,11 @@ export default function Sell() {
     sessionStorage.removeItem("resumeReceipt");
   }, []);
 
-  /* ================= HELPERS ================= */
-  const heldBadgeColor =
-    heldCount >= 4
-      ? "bg-red-600"
-      : heldCount > 0
-      ? "bg-amber-500"
-      : "bg-gray-400";
-
   /* ================= FILTERS ================= */
   const filteredProducts =
     search.trim() === ""
       ? []
-      : products.filter(p =>
+      : products.filter((p) =>
           `${p.name} ${p.sku || ""} ${p.barcode || ""}`
             .toLowerCase()
             .includes(search.toLowerCase())
@@ -97,15 +89,17 @@ export default function Sell() {
   const filteredCustomers =
     customerSearch.trim() === ""
       ? []
-      : customers.filter(c =>
-          `${c.firstName || ""} ${c.lastName || ""} ${c.phone || ""} ${c.email || ""}`
+      : customers.filter((c) =>
+          `${c.firstName || ""} ${c.lastName || ""} ${
+            c.phone || ""
+          } ${c.email || ""}`
             .toLowerCase()
             .includes(customerSearch.toLowerCase())
         );
 
   /* ================= CART ================= */
   const addToCart = (product, source = "search") => {
-    setCart(prev => [
+    setCart((prev) => [
       ...prev,
       {
         cartId: crypto.randomUUID(),
@@ -120,15 +114,15 @@ export default function Sell() {
   };
 
   const updateQty = (id, delta) => {
-    setCart(prev =>
+    setCart((prev) =>
       prev
-        .map(i => (i.cartId === id ? { ...i, qty: i.qty + delta } : i))
-        .filter(i => i.qty > 0)
+        .map((i) => (i.cartId === id ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0)
     );
   };
 
   const removeItem = (id) =>
-    setCart(prev => prev.filter(i => i.cartId !== id));
+    setCart((prev) => prev.filter((i) => i.cartId !== id));
 
   /* ================= TOTALS ================= */
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -136,7 +130,7 @@ export default function Sell() {
   const tax = subtotal * taxRate;
   const total = subtotal + tax;
 
-  /* ================= HOLD ================= */
+  /* ================= HOLD RECEIPT ================= */
   const holdReceipt = async (print = false) => {
     if (!cart.length) return;
 
@@ -169,7 +163,7 @@ export default function Sell() {
     setInstaller(null);
   };
 
-  /* ================= CHECKOUT ================= */
+  /* ================= COMPLETE SALE ================= */
   const completeSale = async (checkoutData) => {
     const payload = {
       status: "completed",
@@ -195,16 +189,24 @@ export default function Sell() {
     window.location.href = "/print-receipt";
   };
 
+  const heldBadgeColor =
+    heldCount >= 4
+      ? "bg-red-600"
+      : heldCount > 0
+      ? "bg-amber-500"
+      : "bg-gray-400";
+
   /* ================= UI ================= */
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* LEFT: Vehicle Fitment + Recommendations */}
       <VehicleFitment
         onVehicleSelected={setSelectedVehicle}
         onAddProduct={(p) => addToCart(p, "fitment")}
       />
 
+      {/* RIGHT: Cart Column */}
       <div className="bg-white p-4 rounded-xl shadow border flex flex-col">
-
         {/* HELD RECEIPTS BUTTON */}
         <div className="flex justify-end mb-2">
           <button
@@ -222,7 +224,7 @@ export default function Sell() {
           </button>
         </div>
 
-        {/* SEARCH */}
+        {/* PRODUCT SEARCH */}
         <input
           placeholder="Search or scan product…"
           value={search}
@@ -232,7 +234,7 @@ export default function Sell() {
 
         {search && (
           <div className="border rounded-lg mt-1 max-h-40 overflow-y-auto">
-            {filteredProducts.map(p => (
+            {filteredProducts.map((p) => (
               <div
                 key={p.id}
                 onMouseDown={() => addToCart(p)}
@@ -247,7 +249,7 @@ export default function Sell() {
           </div>
         )}
 
-        {/* CUSTOMER */}
+        {/* CUSTOMER PANEL */}
         <div className="mt-4 border rounded-lg p-3 bg-gray-50">
           {!selectedCustomer ? (
             <>
@@ -257,9 +259,10 @@ export default function Sell() {
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 className="w-full h-10 px-3 rounded border"
               />
+
               {filteredCustomers.length > 0 && (
                 <div className="border rounded mt-1 max-h-32 overflow-y-auto">
-                  {filteredCustomers.map(c => (
+                  {filteredCustomers.map((c) => (
                     <div
                       key={c.id}
                       onMouseDown={() => {
@@ -276,7 +279,9 @@ export default function Sell() {
             </>
           ) : (
             <div className="flex justify-between text-sm">
-              <strong>{selectedCustomer.firstName} {selectedCustomer.lastName}</strong>
+              <strong>
+                {selectedCustomer.firstName} {selectedCustomer.lastName}
+              </strong>
               <button
                 onClick={() => setSelectedCustomer(null)}
                 className="text-red-600 text-xs"
@@ -287,40 +292,55 @@ export default function Sell() {
           )}
         </div>
 
-        {/* INSTALLER */}
+        {/* INSTALLER DROPDOWN */}
         <div className="mt-3 flex items-center gap-2 text-sm">
           <span className="font-semibold">Installer</span>
           <select
             value={installer?.id || ""}
             onChange={(e) =>
-              setInstaller(installers.find(i => i.id === e.target.value) || null)
+              setInstaller(
+                installers.find((i) => i.id === e.target.value) || null
+              )
             }
             className="flex-1 border px-2 py-1 rounded"
           >
             <option value="">Unassigned</option>
-            {installers.map(i => (
-              <option key={i.id} value={i.id}>{i.name}</option>
+            {installers.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* CART */}
+        {/* CART ITEMS */}
         <div className="flex-1 mt-4 overflow-y-auto">
-          {cart.map(i => (
-            <div key={i.cartId} className="border-b py-2 flex justify-between text-sm">
+          {cart.map((i) => (
+            <div
+              key={i.cartId}
+              className="border-b py-2 flex justify-between text-sm"
+            >
               <span>{i.name}</span>
+
               <div className="flex items-center gap-2">
                 <button onClick={() => updateQty(i.cartId, -1)}>-</button>
                 <span>{i.qty}</span>
                 <button onClick={() => updateQty(i.cartId, 1)}>+</button>
+
                 <span>${(i.price * i.qty).toFixed(2)}</span>
-                <button onClick={() => removeItem(i.cartId)} className="text-red-600">✕</button>
+
+                <button
+                  onClick={() => removeItem(i.cartId)}
+                  className="text-red-600"
+                >
+                  ✕
+                </button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* TOTALS */}
+        {/* TOTALS + HOLD/PRINT/CHECKOUT */}
         <div className="border-t pt-3 space-y-2">
           <div className="flex justify-between font-semibold">
             <span>Subtotal</span>
